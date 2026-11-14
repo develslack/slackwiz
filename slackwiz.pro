@@ -1,4 +1,4 @@
-QT += core gui widgets
+QT += core gui widgets network
 
 CONFIG += c++17
 TARGET = slackwiz
@@ -30,12 +30,32 @@ SOURCES += \
     src/main.cpp \
     src/core/logger.cpp \
     src/core/commandRunner.cpp \
+    src/modules/localemanager.cpp \
+    src/modules/keyboardManager.cpp \
+    src/modules/userManager.cpp \
+    src/modules/groupManager.cpp \
+    src/modules/sudoManager.cpp \
+    src/modules/webServerManager.cpp \
+    src/modules/databaseManager.cpp \
+    src/modules/timeManager.cpp \
+    src/ui/timezoneMapWidget.cpp \
+    src/ui/timeConfigWidget.cpp \
     src/ui/mainWindow.cpp
 
 # Archivos de cabecera
 HEADERS += \
     src/core/logger.h \
     src/core/commandRunner.h \
+    src/modules/localeManager.h \
+    src/modules/keyboardManager.h \
+    src/modules/userManager.h \
+    src/modules/groupManager.h \
+    src/modules/sudoManager.h \
+    src/modules/webServerManager.h \
+    src/modules/databaseManager.h \
+    src/modules/timeManager.h \
+    src/ui/timezoneMapWidget.h \
+    src/ui/timeConfigWidget.h \
     src/ui/mainWindow.h
 
 # Reglas de instalación (make install)

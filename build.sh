@@ -11,6 +11,7 @@ NC='\033[0m'
 MODE="debug"
 DO_CLEAN=0
 DO_INSTALL=0
+RUN_AS_ROOT=0
 
 show_help() {
     echo "Uso: ./build.sh [OPCIONES]"
@@ -19,12 +20,14 @@ show_help() {
     echo "  --debug     Compila con trazas detalladas en consola (por defecto)"
     echo "  --release   Compila optimizado sin trazas de depuración"
     echo "  --clean     Elimina compilaciones previas antes de compilar"
+    echo "  --root      Ejecuta la aplicación compilada con privilegios de root (vía su)"
     echo "  --install   Instala la aplicación en /usr/local/bin (requiere root)"
     echo "  --help      Muestra esta ayuda"
     echo ""
     echo "Ejemplos:"
     echo "  ./build.sh --debug"
-    echo "  ./build.sh --release"
+    echo "  ./build.sh --debug --root"
+    echo "  ./build.sh --release --root"
     echo "  ./build.sh --clean --release --install"
 }
 
@@ -39,6 +42,9 @@ for arg in "$@"; do
             ;;
         --clean)
             DO_CLEAN=1
+            ;;
+        --root|--as-root)
+            RUN_AS_ROOT=1
             ;;
         --install)
             DO_INSTALL=1
@@ -99,8 +105,36 @@ if [ "$DO_INSTALL" -eq 1 ]; then
     echo -e "${CYAN}[INSTALL] Instalando slackwiz en el sistema...${NC}"
     make install
     echo -e "${GREEN}[OK] Instalación completada en /usr/local/bin/slackwiz${NC}"
+elif [ "$RUN_AS_ROOT" -eq 1 ]; then
+    if [ "$EUID" -eq 0 ]; then
+        echo -e "${CYAN}[RUN] Ejecutando ./build/slackwiz (ya eres root)...${NC}"
+        echo "------------------------------------------------------------"
+        ./build/slackwiz
+    else
+        echo -e "${YELLOW}[ROOT] Solicitando contraseña de root para ejecutar ./build/slackwiz...${NC}"
+
+        # Permitir conexión local de root al servidor X11 actual
+        if command -v xhost >/dev/null 2>&1 && [ -n "$DISPLAY" ]; then
+            xhost +si:localuser:root >/dev/null 2>&1 || true
+        fi
+
+        XAUTH_FILE="${XAUTHORITY:-$HOME/.Xauthority}"
+        echo "------------------------------------------------------------"
+
+        set +e
+        su root -c "DISPLAY='$DISPLAY' XAUTHORITY='$XAUTH_FILE' ./build/slackwiz"
+        APP_EXIT=$?
+        set -e
+
+        # Revocar permiso temporal de X11 al cerrar la app
+        if command -v xhost >/dev/null 2>&1 && [ -n "$DISPLAY" ]; then
+            xhost -si:localuser:root >/dev/null 2>&1 || true
+        fi
+
+        exit $APP_EXIT
+    fi
 else
-    echo -e "${CYAN}[RUN] Ejecutando ./build/slackwiz...${NC}"
+    echo -e "${CYAN}[RUN] Ejecutando ./build/slackwiz (usuario actual)...${NC}"
     echo "------------------------------------------------------------"
     ./build/slackwiz
 fi
