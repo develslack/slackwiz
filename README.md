@@ -100,36 +100,38 @@ El Módulo 8 combina tres componentes especializados:
 
 ```text
 slackwiz/
-├── build.sh                  # Script automatizado de compilación, limpieza e instalación
-├── CMakeLists.txt            # Configuración de compilación con CMake (Qt5::Widgets, Qt5::Network)
-├── slackwiz.pro              # Archivo de proyecto alternativo para qmake
-├── README.md                 # Documentación técnica y de usuario
+├── build.sh                            # Script automatizado de compilación, limpieza e instalación
+├── CMakeLists.txt                      # Configuración de compilación con CMake (Qt5::Widgets, Qt5::Network)
+├── slackwiz.pro                        # Archivo de proyecto alternativo para qmake
+├── README.md                           # Documentación técnica y de usuario
 └── src/
-    ├── main.cpp              # Punto de entrada de la aplicación Qt (QApplication)
-    ├── mainWindow.h          # Declaración de la ventana principal y slots de los 9 módulos
-    ├── mainWindow.cpp        # Construcción de UI, navegación y enlace con los Managers
-    ├── commandRunner.h       # Interfaz de ejecución segura de comandos y detección de entorno
-    ├── commandRunner.cpp     # Implementación basada en QProcess y verificación geteuid()
-    ├── logger.h              # Macros y niveles de registro de eventos (LOG_INFO, etc.)
-    ├── logger.cpp            # Salida formateada de logs de ejecución y depuración
-    ├── localeManager.h       # Estructuras y API del Módulo 1 (Idioma)
-    ├── localeManager.cpp     # Lectura/escritura de /etc/profile.d/lang.sh
-    ├── keyboardManager.h     # Estructuras y API del Módulo 2 (Teclado)
-    ├── keyboardManager.cpp   # Gestión de setxkbmap, rc.keymap y xorg.conf.d
-    ├── userManager.h         # Estructuras y API del Módulo 3 (Creación de usuarios)
-    ├── userManager.cpp       # Validación y ejecución de useradd / chpasswd
-    ├── groupManager.h        # Estructuras y API del Módulo 4 (Grupos secundarios)
-    ├── groupManager.cpp      # Consulta de /etc/group y actualización vía usermod
-    ├── sudoManager.h         # Estructuras y API del Módulo 5 (Privilegios sudo)
-    ├── sudoManager.cpp       # Gestión segura de /etc/sudoers.d/ y grupo wheel
-    ├── webServerManager.h    # Estructuras y API del Módulo 6 (Apache/Nginx + PHP)
-    ├── webServerManager.cpp  # Configuración de virtualhosts, php.ini y control de rc.d
-    ├── databaseManager.h     # Estructuras y API del Módulo 7 (MariaDB / PostgreSQL)
-    ├── databaseManager.cpp   # Inicialización, hardening, prueba SQL y control de rc.d
-    ├── timeManager.h         # Estructuras y API del Módulo 8 (Fecha, Hora y Zona Horaria)
-    ├── timeManager.cpp       # Parser de zone1970.tab, /etc/localtime, hwclock y rc.ntpd
-    ├── timezoneMapWidget.h   # Widget gráfico interactivo del mapamundi
-    └── timezoneMapWidget.cpp # Renderizado QPainter y selección por proximidad geográfica
+    ├── main.cpp                        # Punto de entrada de la aplicación Qt (QApplication)
+    ├── ui/mainWindow.h                 # Declaración de la ventana principal y slots de los 9 módulos
+    ├── ui/mainWindow.cpp               # Construcción de UI, navegación y enlace con los Managers
+    ├── core/commandRunner.h            # Interfaz de ejecución segura de comandos y detección de entorno
+    ├── core/commandRunner.cpp          # Implementación basada en QProcess y verificación geteuid()
+    ├── core/logger.h                   # Macros y niveles de registro de eventos (LOG_INFO, etc.)
+    ├── core/logger.cpp                 # Salida formateada de logs de ejecución y depuración
+    ├── modules/localeManager.h         # Estructuras y API del Módulo 1 (Idioma)
+    ├── modules/localeManager.cpp       # Lectura/escritura de /etc/profile.d/lang.sh
+    ├── modules/keyboardManager.h       # Estructuras y API del Módulo 2 (Teclado)
+    ├── modules/keyboardManager.cpp     # Gestión de setxkbmap, rc.keymap y xorg.conf.d
+    ├── modules/userManager.h           # Estructuras y API del Módulo 3 (Creación de usuarios)
+    ├── modules/userManager.cpp         # Validación y ejecución de useradd / chpasswd
+    ├── modules/groupManager.h          # Estructuras y API del Módulo 4 (Grupos secundarios)
+    ├── modules/groupManager.cpp        # Consulta de /etc/group y actualización vía usermod
+    ├── modules/sudoManager.h           # Estructuras y API del Módulo 5 (Privilegios sudo)
+    ├── modules/sudoManager.cpp         # Gestión segura de /etc/sudoers.d/ y grupo wheel
+    ├── modules/webServerManager.h      # Estructuras y API del Módulo 6 (Apache/Nginx + PHP)
+    ├── modules/webServerManager.cpp    # Configuración de virtualhosts, php.ini y control de rc.d
+    ├── modules/databaseManager.h       # Estructuras y API del Módulo 7 (MariaDB / PostgreSQL)
+    ├── modules/databaseManager.cpp     # Inicialización, hardening, prueba SQL y control de rc.d
+    ├── modules/timeManager.h           # Estructuras y API del Módulo 8 (Fecha, Hora y Zona Horaria)
+    ├── modules/timeManager.cpp         # Parser de zone1970.tab, /etc/localtime, hwclock y rc.ntpd
+    ├── ui/timezoneMapWidget.h          # Widget gráfico interactivo del mapamundi
+    └── ui/timezoneMapWidget.cpp        # Renderizado QPainter y selección por proximidad geográfica
+    ├── ui/timeConfigWidget.h           # Widget gráfico soporte para timezoneMapWidget
+    └── ui/timeConfigWidget.cpp         # Widget gráfico soporte para timezoneMapWidget
 ```
 
 ---
@@ -167,6 +169,12 @@ Primero, asegúrate de que el script tenga permisos de ejecución:
 
 ```bash
 chmod +x build.sh
+```
+
+#### 0. Ayuda de build.sh
+Antes de lanzar el compilador revise las opciones de ejcución de `build.sh`:
+```bash
+./build.sh --help
 ```
 
 #### 1. Compilación estándar (Release)
