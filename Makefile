@@ -37,7 +37,7 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = slackwiz1.0.0
-DISTDIR = /mnt/storage/Desarrollo/QT/slackwiz/build/.obj/slackwiz1.0.0
+DISTDIR = /mnt/storage/desarrollo/QT/slackwiz/build/.obj/slackwiz1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-rpath,/usr/lib64
 LIBS          = $(SUBLIBS) /usr/lib64/libQt5Widgets.so /usr/lib64/libQt5Gui.so /usr/lib64/libQt5Network.so /usr/lib64/libQt5Core.so -lGL -lpthread   
@@ -1267,21 +1267,21 @@ build/.moc/moc_timezoneMapWidget.cpp: src/ui/timezoneMapWidget.h \
 		src/modules/timeManager.h \
 		build/.moc/moc_predefs.h \
 		/usr/lib64/qt5/bin/moc
-	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/Desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/Desarrollo/QT/slackwiz -I/mnt/storage/Desarrollo/QT/slackwiz/src -I/mnt/storage/Desarrollo/QT/slackwiz/src/core -I/mnt/storage/Desarrollo/QT/slackwiz/src/ui -I/mnt/storage/Desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timezoneMapWidget.h -o build/.moc/moc_timezoneMapWidget.cpp
+	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/desarrollo/QT/slackwiz -I/mnt/storage/desarrollo/QT/slackwiz/src -I/mnt/storage/desarrollo/QT/slackwiz/src/core -I/mnt/storage/desarrollo/QT/slackwiz/src/ui -I/mnt/storage/desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timezoneMapWidget.h -o build/.moc/moc_timezoneMapWidget.cpp
 
 build/.moc/moc_timeConfigWidget.cpp: src/ui/timeConfigWidget.h \
 		src/ui/timezoneMapWidget.h \
 		src/modules/timeManager.h \
 		build/.moc/moc_predefs.h \
 		/usr/lib64/qt5/bin/moc
-	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/Desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/Desarrollo/QT/slackwiz -I/mnt/storage/Desarrollo/QT/slackwiz/src -I/mnt/storage/Desarrollo/QT/slackwiz/src/core -I/mnt/storage/Desarrollo/QT/slackwiz/src/ui -I/mnt/storage/Desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timeConfigWidget.h -o build/.moc/moc_timeConfigWidget.cpp
+	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/desarrollo/QT/slackwiz -I/mnt/storage/desarrollo/QT/slackwiz/src -I/mnt/storage/desarrollo/QT/slackwiz/src/core -I/mnt/storage/desarrollo/QT/slackwiz/src/ui -I/mnt/storage/desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timeConfigWidget.h -o build/.moc/moc_timeConfigWidget.cpp
 
 build/.moc/moc_mainWindow.cpp: src/ui/mainWindow.h \
 		src/modules/timeManager.h \
 		src/ui/timezoneMapWidget.h \
 		build/.moc/moc_predefs.h \
 		/usr/lib64/qt5/bin/moc
-	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/Desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/Desarrollo/QT/slackwiz -I/mnt/storage/Desarrollo/QT/slackwiz/src -I/mnt/storage/Desarrollo/QT/slackwiz/src/core -I/mnt/storage/Desarrollo/QT/slackwiz/src/ui -I/mnt/storage/Desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/mainWindow.h -o build/.moc/moc_mainWindow.cpp
+	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/desarrollo/QT/slackwiz -I/mnt/storage/desarrollo/QT/slackwiz/src -I/mnt/storage/desarrollo/QT/slackwiz/src/core -I/mnt/storage/desarrollo/QT/slackwiz/src/ui -I/mnt/storage/desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/mainWindow.h -o build/.moc/moc_mainWindow.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -1399,7 +1399,7 @@ uninstall_target: FORCE
 
 install_desktop: first FORCE
 	@test -d $(INSTALL_ROOT)/usr/local/share/applications || mkdir -p $(INSTALL_ROOT)/usr/local/share/applications
-	$(QINSTALL) /mnt/storage/Desarrollo/QT/slackwiz/resources/slackwiz.desktop $(INSTALL_ROOT)/usr/local/share/applications/slackwiz.desktop
+	$(QINSTALL) /mnt/storage/desarrollo/QT/slackwiz/resources/slackwiz.desktop $(INSTALL_ROOT)/usr/local/share/applications/slackwiz.desktop
 
 uninstall_desktop: FORCE
 	-$(DEL_FILE) -r $(INSTALL_ROOT)/usr/local/share/applications/slackwiz.desktop

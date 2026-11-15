@@ -178,19 +178,31 @@ Genera el binario optimizado en `build/slackwiz`:
 #### 2. Compilación en modo depuración (Debug)
 Habilita logs extendidos y muestra la etiqueta `[COMPILACIÓN DEBUG]` en la interfaz:
 ```bash
-./build.sh debug
+./build.sh --debug
 ```
 
-#### 3. Limpiar archivos de compilación previos y recompilar desde cero
+#### 3. Compilación en modo depuración (Debug) con permisos de root
+Habilita logs extendidos y muestra la etiqueta `[COMPILACIÓN DEBUG]` en la interfaz con permisos de root (PRECAUCION):
+```bash
+./build.sh --debug --root
+```
+
+#### 4. Limpiar archivos de compilación previos y recompilar desde cero
 Elimina el directorio `build/` antes de iniciar una nueva compilación limpia:
 ```bash
-./build.sh clean
+./build.sh --clean
 ```
 
-#### 4. Instalar el binario en el sistema (`/usr/local/bin/slackwiz`)
+#### 5. Compilación en modo depuración (Debug) con permisos de root y recompilación desde cero (CLEAN)
+Habilita logs extendidos y muestra la etiqueta `[COMPILACIÓN DEBUG]` en la interfaz con permisos de root (PRECAUCION):
+```bash
+./build.sh --clean --debug --root
+```
+
+#### 6. Instalar el binario en el sistema (`/usr/local/bin/slackwiz`)
 Compila (si es necesario) e instala el ejecutable globalmente (requiere permisos de `root`):
 ```bash
-su -c "./build.sh install"
+su -c "./build.sh --install"
 ```
 
 ### Ejecución de la aplicación
