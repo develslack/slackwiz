@@ -2,7 +2,7 @@
 Name=Slackware Wizard
 GenericName=Asistente de Configuración de Slackware
 Comment=Configura idioma, teclado, usuarios, sudo, servidores web y bases de datos en Slackware
-Exec=/usr/local/bin/slackwiz
+Exec=sh -c "pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY /usr/local/bin/slackwiz/slackwiz"
 Icon=preferences-system
 Terminal=false
 Type=Application

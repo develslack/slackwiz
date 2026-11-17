@@ -38,6 +38,7 @@ SOURCES += \
     src/modules/webServerManager.cpp \
     src/modules/databaseManager.cpp \
     src/modules/timeManager.cpp \
+    src/modules/ServiceManager.cpp \
     src/ui/timezoneMapWidget.cpp \
     src/ui/timeConfigWidget.cpp \
     src/ui/mainWindow.cpp
@@ -54,12 +55,13 @@ HEADERS += \
     src/modules/webServerManager.h \
     src/modules/databaseManager.h \
     src/modules/timeManager.h \
+    src/modules/ServiceManager.h \
     src/ui/timezoneMapWidget.h \
     src/ui/timeConfigWidget.h \
     src/ui/mainWindow.h
 
 # Reglas de instalación (make install)
-target.path = /usr/local/bin
+target.path = /usr/local/bin/slackwiz
 desktop.path = /usr/local/share/applications
 desktop.files = resources/slackwiz.desktop
 

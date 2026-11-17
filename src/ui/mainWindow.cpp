@@ -27,6 +27,14 @@
 #include <QTimer>
 #include <QStyle>
 #include <QFont>
+#include <QHeaderView>
+#include <QTableWidgetItem>
+#include <QAbstractItemView>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QBrush>
+#include <QColor>
+#include <QFileInfo>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -138,7 +146,28 @@ MainWindow::MainWindow(QWidget *parent)
       m_chkTimeHwUtc(nullptr),
       m_btnSaveTimeConfig(nullptr),
       m_lblTimeFeedback(nullptr),
-      m_timePreviewTimer(nullptr)
+      m_timePreviewTimer(nullptr),
+      m_lblServicesSummary(nullptr),
+      m_btnToggleAdvancedServices(nullptr),
+      m_btnConfigureSamba(nullptr),
+      m_serviceDangerBanner(nullptr),
+      m_editServiceSearch(nullptr),
+      m_comboServiceCategoryFilter(nullptr),
+      m_btnPresetDesktopServices(nullptr),
+      m_btnPresetServerServices(nullptr),
+      m_tblServices(nullptr),
+      m_serviceDetailBox(nullptr),
+      m_lblServiceDetailTitle(nullptr),
+      m_lblServiceDetailDesc(nullptr),
+      m_lblServiceConflictAlert(nullptr),
+      m_lblServiceFeedback(nullptr),
+      m_serviceAdvancedPanel(nullptr),
+      m_serviceAdvancedTabs(nullptr),
+      m_lblScriptViewerHeader(nullptr),
+      m_txtServiceScriptViewer(nullptr),
+      m_comboLocalBootScript(nullptr),
+      m_txtLocalBootScriptEditor(nullptr),
+      m_btnSaveLocalBootScript(nullptr)
 {
     LOG_INFO("MainWindow", "Inicializando interfaz gráfica principal...");
     setupUi();
@@ -156,8 +185,8 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::setupUi()
 {
     setWindowTitle("Slackware Wizard (slackwiz) - Asistente de Configuración");
-    resize(1040, 740);
-    setMinimumSize(900, 620);
+    resize(1060, 760);
+    setMinimumSize(920, 640);
 
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
@@ -275,7 +304,8 @@ void MainWindow::setupNavigationMenu()
         { "5. Configurar sudo",     QStyle::SP_MessageBoxWarning },
         { "6. Servidor web",        QStyle::SP_DriveNetIcon },
         { "7. Base de datos",       QStyle::SP_DriveHDIcon },
-        { "8. Hora del sistema",    QStyle::SP_BrowserReload }
+        { "8. Hora del sistema",    QStyle::SP_BrowserReload },
+        { "9. Servicios (rc.d)",    QStyle::SP_FileDialogContentsView }
     };
 
     for (const auto &item : items) {
@@ -299,6 +329,7 @@ void MainWindow::setupPages()
     m_pagesStack->addWidget(createWebServerPage());
     m_pagesStack->addWidget(createDatabasePage());
     m_pagesStack->addWidget(createTimePage());
+    m_pagesStack->addWidget(createServicesPage());
 }
 
 QWidget* MainWindow::createWelcomePage()
@@ -337,7 +368,7 @@ QWidget* MainWindow::createWelcomePage()
     QLabel *sysInfo = new QLabel(
         QString("<b>Sistema detectado:</b> %1<br>"
                 "<b>Permisos de administrador:</b> %2<br>"
-                "<b>Módulos disponibles:</b> Idioma, Teclado, Usuarios, Grupos, Sudo, Servidor Web, Base de Datos y Hora.")
+                "<b>Módulos disponibles:</b> Idioma, Teclado, Usuarios, Grupos, Sudo, Servidor Web, Base de Datos, Hora y Servicios (rc.d).")
             .arg(slackVer, rootState),
         infoBox
     );
@@ -3179,6 +3210,1026 @@ void MainWindow::onSaveTimeConfigClicked()
     }
 }
 
+// ============================================================================
+// MÓDULO 9: GESTOR VISUAL DE SERVICIOS DEL SISTEMA (/etc/rc.d/rc.*)
+// ============================================================================
+
+QWidget* MainWindow::createServicesPage()
+{
+    QScrollArea *scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+
+    QWidget *page = new QWidget(scrollArea);
+    QVBoxLayout *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 8, 0);
+    layout->setSpacing(12);
+
+    QLabel *title = new QLabel("9. Gestor Visual de Servicios del Sistema (rc.d)", page);
+    QFont titleFont = title->font();
+    titleFont.setPointSize(16);
+    titleFont.setBold(true);
+    title->setFont(titleFont);
+
+    QLabel *subtitle = new QLabel(
+        "En Slackware los servicios se controlan mediante scripts en /etc/rc.d/rc.* y su permiso de ejecución (+x). "
+        "Aquí puedes ver qué servicios están activos, controlarlos al instante y decidir cuáles arrancan con el equipo. "
+        "Toda modificación solicitará confirmación con tu contraseña de administrador (root).",
+        page
+    );
+    subtitle->setWordWrap(true);
+    subtitle->setStyleSheet("font-size: 13px;");
+
+    // Barra superior: Resumen + Botón Modo Avanzado ("Zona de Cuidado") + Actualizar
+    QFrame *topSummaryBox = new QFrame(page);
+    topSummaryBox->setStyleSheet(
+        "QFrame { background-color: #eef4fa; border: 1px solid #b6d4fe; border-radius: 6px; padding: 10px; }"
+    );
+    QHBoxLayout *topSummaryLayout = new QHBoxLayout(topSummaryBox);
+    topSummaryLayout->setSpacing(10);
+
+    m_lblServicesSummary = new QLabel(topSummaryBox);
+    m_lblServicesSummary->setWordWrap(true);
+    m_lblServicesSummary->setStyleSheet("border: none; font-size: 12px; color: #084298;");
+
+    QPushButton *btnRefreshServices = new QPushButton("Actualizar estado", topSummaryBox);
+    btnRefreshServices->setMinimumHeight(32);
+    btnRefreshServices->setStyleSheet("font-size: 12px; padding: 4px 10px;");
+
+    m_btnToggleAdvancedServices = new QPushButton("Configuración Avanzada", topSummaryBox);
+    m_btnToggleAdvancedServices->setMinimumHeight(32);
+    m_btnToggleAdvancedServices->setStyleSheet(
+        "QPushButton { background-color: #495057; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+        "QPushButton:hover { background-color: #343a40; }"
+    );
+
+    topSummaryLayout->addWidget(m_lblServicesSummary, 1);
+    topSummaryLayout->addWidget(btnRefreshServices);
+    topSummaryLayout->addWidget(m_btnToggleAdvancedServices);
+
+    // Banner de advertencia visible solo cuando está activo el Modo Avanzado
+    m_serviceDangerBanner = new QFrame(page);
+    m_serviceDangerBanner->setVisible(false);
+    m_serviceDangerBanner->setStyleSheet(
+        "QFrame { background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 6px; padding: 10px; }"
+    );
+    QHBoxLayout *dangerLayout = new QHBoxLayout(m_serviceDangerBanner);
+    QLabel *lblDangerText = new QLabel(
+        "<b>ZONA DE CUIDADO ACTIVA (Modo Avanzado):</b> Se muestran también los scripts críticos del sistema base "
+        "(rc.S, rc.M, rc.udev, rc.inet1, etc.) y las herramientas de edición de arranque local. Procede con precaución.",
+        m_serviceDangerBanner
+    );
+    lblDangerText->setWordWrap(true);
+    lblDangerText->setStyleSheet("border: none; font-size: 12px; color: #664d03;");
+    dangerLayout->addWidget(lblDangerText);
+
+    // Barra de perfiles recomendados (principiantes) + Filtros de búsqueda
+    QFrame *controlsBox = new QFrame(page);
+    controlsBox->setStyleSheet(
+        "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px; }"
+    );
+    QVBoxLayout *controlsLayout = new QVBoxLayout(controlsBox);
+    controlsLayout->setSpacing(8);
+
+    QHBoxLayout *presetsRow = new QHBoxLayout();
+    QLabel *lblPresets = new QLabel("Perfiles rápidos recomendados:", controlsBox);
+    lblPresets->setStyleSheet("border: none; font-weight: bold; font-size: 12px; color: #212529;");
+
+    m_btnPresetDesktopServices = new QPushButton("Perfil Laptop / Escritorio", controlsBox);
+    m_btnPresetDesktopServices->setStyleSheet(
+        "QPushButton { background-color: #0d6efd; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+        "QPushButton:hover { background-color: #0b5ed7; }"
+    );
+
+    m_btnPresetServerServices = new QPushButton("Perfil Servidor / Desarrollo", controlsBox);
+    m_btnPresetServerServices->setStyleSheet(
+        "QPushButton { background-color: #198754; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+        "QPushButton:hover { background-color: #157347; }"
+    );
+
+    presetsRow->addWidget(lblPresets);
+    presetsRow->addWidget(m_btnPresetDesktopServices);
+    presetsRow->addWidget(m_btnPresetServerServices);
+    presetsRow->addStretch();
+
+    QHBoxLayout *filterRow = new QHBoxLayout();
+    m_editServiceSearch = new QLineEdit(controlsBox);
+    m_editServiceSearch->setMinimumHeight(30);
+    m_editServiceSearch->setPlaceholderText("Filtrar servicio por nombre o función (ej. bluetooth, ssh, red, apache, docker)...");
+    m_editServiceSearch->setStyleSheet("background-color: white; padding: 3px 8px; font-size: 12px;");
+
+    m_comboServiceCategoryFilter = new QComboBox(controlsBox);
+    m_comboServiceCategoryFilter->setMinimumHeight(30);
+    m_comboServiceCategoryFilter->setMinimumWidth(210);
+    m_comboServiceCategoryFilter->setStyleSheet("background-color: white; font-size: 12px; padding: 3px 8px;");
+    m_comboServiceCategoryFilter->addItem("Todas las categorías", -1);
+    m_comboServiceCategoryFilter->addItem("Red y Seguridad", static_cast<int>(ServiceCategory::NetworkSecurity));
+    m_comboServiceCategoryFilter->addItem("Escritorio y Hardware", static_cast<int>(ServiceCategory::DesktopHardware));
+    m_comboServiceCategoryFilter->addItem("Servidores y Bases de Datos", static_cast<int>(ServiceCategory::ServersDatabases));
+    m_comboServiceCategoryFilter->addItem("SlackBuilds / Terceros", static_cast<int>(ServiceCategory::ThirdPartySlackBuild));
+
+    filterRow->addWidget(m_editServiceSearch, 1);
+    filterRow->addWidget(m_comboServiceCategoryFilter);
+
+    controlsLayout->addLayout(presetsRow);
+    controlsLayout->addLayout(filterRow);
+
+    // Tabla principal de /etc/rc.d/rc.*
+    m_tblServices = new QTableWidget(page);
+    m_tblServices->setColumnCount(5);
+    m_tblServices->setHorizontalHeaderLabels({
+        "Servicio (rc.*)",
+        "Categoría",
+        "Estado actual",
+        "Arranque (+x)",
+        "Acciones rápidas (root)"
+    });
+    m_tblServices->setMinimumHeight(290);
+    m_tblServices->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_tblServices->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_tblServices->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_tblServices->setAlternatingRowColors(true);
+    m_tblServices->verticalHeader()->setVisible(false);
+    m_tblServices->verticalHeader()->setDefaultSectionSize(38);
+    m_tblServices->setStyleSheet(
+        "QTableWidget { background-color: white; alternate-background-color: #f8f9fa; "
+        "border: 1px solid #d0d7de; border-radius: 6px; font-size: 12px; }"
+        "QHeaderView::section { background-color: #e9ecef; font-weight: bold; padding: 6px; border: none; border-bottom: 1px solid #ced4da; }"
+    );
+
+    QHeaderView *header = m_tblServices->horizontalHeader();
+    header->setSectionResizeMode(0, QHeaderView::Stretch);
+    header->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    header->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    header->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    header->setSectionResizeMode(4, QHeaderView::Fixed);
+    m_tblServices->setColumnWidth(4, 225);
+
+    // Tarjeta de detalle del servicio seleccionado + alerta de conflictos + Botón Samba
+    m_serviceDetailBox = new QFrame(page);
+    m_serviceDetailBox->setStyleSheet(
+        "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px; }"
+    );
+    QVBoxLayout *detailLayout = new QVBoxLayout(m_serviceDetailBox);
+    detailLayout->setSpacing(4);
+
+    m_lblServiceDetailTitle = new QLabel("Selecciona un servicio de la tabla para ver su descripción detallada", m_serviceDetailBox);
+    m_lblServiceDetailTitle->setStyleSheet("border: none; font-weight: bold; font-size: 13px; color: #212529;");
+
+    m_lblServiceDetailDesc = new QLabel("Haz clic sobre cualquier fila para consultar qué hace ese servicio y qué acciones admite.", m_serviceDetailBox);
+    m_lblServiceDetailDesc->setWordWrap(true);
+    m_lblServiceDetailDesc->setStyleSheet("border: none; font-size: 12px; color: #495057;");
+
+    m_lblServiceConflictAlert = new QLabel(m_serviceDetailBox);
+    m_lblServiceConflictAlert->setWordWrap(true);
+    m_lblServiceConflictAlert->setVisible(false);
+    m_lblServiceConflictAlert->setStyleSheet(
+        "QLabel { background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5; "
+        "border-radius: 4px; padding: 6px; font-size: 12px; font-weight: bold; margin-top: 4px; }"
+    );
+
+    m_btnConfigureSamba = new QPushButton("⚙ Configurar recursos compartidos de Samba (smb.conf)", m_serviceDetailBox);
+    m_btnConfigureSamba->setVisible(false);
+    m_btnConfigureSamba->setStyleSheet(
+        "QPushButton { background-color: #0d6efd; color: white; font-weight: bold; border-radius: 4px; padding: 5px 12px; font-size: 12px; margin-top: 6px; }"
+        "QPushButton:hover { background-color: #0b5ed7; }"
+    );
+    connect(m_btnConfigureSamba, &QPushButton::clicked, this, &MainWindow::onConfigureSambaClicked);
+
+    detailLayout->addWidget(m_lblServiceDetailTitle);
+    detailLayout->addWidget(m_lblServiceDetailDesc);
+    detailLayout->addWidget(m_lblServiceConflictAlert);
+    detailLayout->addWidget(m_btnConfigureSamba);
+
+    // Etiqueta de resultado de operaciones
+    m_lblServiceFeedback = new QLabel(page);
+    m_lblServiceFeedback->setWordWrap(true);
+    m_lblServiceFeedback->setVisible(false);
+
+    // Panel Avanzado (oculto por defecto; visible solo en Modo Avanzado)
+    m_serviceAdvancedPanel = new QFrame(page);
+    m_serviceAdvancedPanel->setVisible(false);
+    m_serviceAdvancedPanel->setStyleSheet(
+        "QFrame { background-color: #ffffff; border: 2px solid #6c757d; border-radius: 6px; padding: 10px; }"
+    );
+    QVBoxLayout *advLayout = new QVBoxLayout(m_serviceAdvancedPanel);
+    advLayout->setSpacing(8);
+
+    QLabel *lblAdvTitle = new QLabel("Herramientas de Control Total para Administradores (Modo Avanzado)", m_serviceAdvancedPanel);
+    lblAdvTitle->setStyleSheet("border: none; font-weight: bold; font-size: 13px; color: #343a40;");
+
+    m_serviceAdvancedTabs = new QTabWidget(m_serviceAdvancedPanel);
+
+    // Pestaña 1: Visor en solo lectura del script rc.* seleccionado
+    QWidget *tabScriptViewer = new QWidget(m_serviceAdvancedTabs);
+    QVBoxLayout *viewerLayout = new QVBoxLayout(tabScriptViewer);
+    m_lblScriptViewerHeader = new QLabel("Selecciona un servicio en la tabla superior para inspeccionar su script /etc/rc.d/rc.*", tabScriptViewer);
+    m_lblScriptViewerHeader->setStyleSheet("border: none; font-size: 12px; font-weight: bold; color: #084298;");
+
+    m_txtServiceScriptViewer = new QPlainTextEdit(tabScriptViewer);
+    m_txtServiceScriptViewer->setReadOnly(true);
+    m_txtServiceScriptViewer->setMinimumHeight(180);
+    m_txtServiceScriptViewer->setStyleSheet(
+        "QPlainTextEdit { background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 12px; border-radius: 4px; padding: 6px; }"
+    );
+    viewerLayout->addWidget(m_lblScriptViewerHeader);
+    viewerLayout->addWidget(m_txtServiceScriptViewer);
+
+    // Pestaña 2: Editor seguro de rc.local y rc.local_shutdown
+    QWidget *tabLocalBoot = new QWidget(m_serviceAdvancedTabs);
+    QVBoxLayout *localBootLayout = new QVBoxLayout(tabLocalBoot);
+
+    QHBoxLayout *localBootTopRow = new QHBoxLayout();
+    QLabel *lblSelectLocal = new QLabel("Archivo de comandos locales:", tabLocalBoot);
+    lblSelectLocal->setStyleSheet("border: none; font-size: 12px; font-weight: bold;");
+
+    m_comboLocalBootScript = new QComboBox(tabLocalBoot);
+    m_comboLocalBootScript->addItem("/etc/rc.d/rc.local (Ejecutar al iniciar el sistema)", false);
+    m_comboLocalBootScript->addItem("/etc/rc.d/rc.local_shutdown (Ejecutar al apagar/reiniciar)", true);
+
+    m_btnSaveLocalBootScript = new QPushButton("Guardar script local (requiere root)", tabLocalBoot);
+    m_btnSaveLocalBootScript->setStyleSheet(
+        "QPushButton { background-color: #2e7d32; color: white; font-weight: bold; border-radius: 4px; padding: 5px 14px; font-size: 12px; }"
+        "QPushButton:hover { background-color: #1b5e20; }"
+    );
+
+    localBootTopRow->addWidget(lblSelectLocal);
+    localBootTopRow->addWidget(m_comboLocalBootScript);
+    localBootTopRow->addStretch();
+    localBootTopRow->addWidget(m_btnSaveLocalBootScript);
+
+    m_txtLocalBootScriptEditor = new QPlainTextEdit(tabLocalBoot);
+    m_txtLocalBootScriptEditor->setMinimumHeight(170);
+    m_txtLocalBootScriptEditor->setStyleSheet(
+        "QPlainTextEdit { background-color: #1e242b; color: #a3be8c; font-family: monospace; font-size: 12px; border-radius: 4px; padding: 6px; }"
+    );
+
+    localBootLayout->addLayout(localBootTopRow);
+    localBootLayout->addWidget(m_txtLocalBootScriptEditor);
+
+    m_serviceAdvancedTabs->addTab(tabScriptViewer, "Inspeccionar script rc.*");
+    m_serviceAdvancedTabs->addTab(tabLocalBoot, "Editar rc.local / rc.local_shutdown");
+
+    advLayout->addWidget(lblAdvTitle);
+    advLayout->addWidget(m_serviceAdvancedTabs);
+
+    layout->addWidget(title);
+    layout->addWidget(subtitle);
+    layout->addWidget(topSummaryBox);
+    layout->addWidget(m_serviceDangerBanner);
+    layout->addWidget(controlsBox);
+    layout->addWidget(m_tblServices);
+    layout->addWidget(m_serviceDetailBox);
+    layout->addWidget(m_lblServiceFeedback);
+    layout->addWidget(m_serviceAdvancedPanel);
+    layout->addStretch();
+
+    connect(btnRefreshServices, &QPushButton::clicked, this, &MainWindow::onRefreshServicesClicked);
+    connect(m_btnToggleAdvancedServices, &QPushButton::clicked, this, &MainWindow::onToggleAdvancedServicesClicked);
+    connect(m_editServiceSearch, &QLineEdit::textChanged, this, &MainWindow::onServiceFilterChanged);
+    connect(m_comboServiceCategoryFilter, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onServiceFilterChanged);
+    connect(m_tblServices, &QTableWidget::itemSelectionChanged,
+            this, &MainWindow::onServiceTableSelectionChanged);
+    connect(m_btnPresetDesktopServices, &QPushButton::clicked,
+            this, &MainWindow::onApplyServicePresetDesktopClicked);
+    connect(m_btnPresetServerServices, &QPushButton::clicked,
+            this, &MainWindow::onApplyServicePresetServerClicked);
+    connect(m_comboLocalBootScript, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onLocalBootScriptSelectorChanged);
+    connect(m_btnSaveLocalBootScript, &QPushButton::clicked,
+            this, &MainWindow::onSaveLocalBootScriptClicked);
+
+    refreshServicesPage();
+    scrollArea->setWidget(page);
+    return scrollArea;
+}
+
+void MainWindow::refreshServicesPage()
+{
+    if (!m_tblServices || !m_lblServicesSummary) {
+        return;
+    }
+
+    m_cachedServices = ServiceManager::listServices(m_serviceAdvancedMode);
+
+    int runningCount = 0;
+    int bootCount = 0;
+    for (const SystemServiceInfo &svc : m_cachedServices) {
+        if (svc.isRunning) {
+            ++runningCount;
+        }
+        if (svc.bootEnabled) {
+            ++bootCount;
+        }
+    }
+
+    m_lblServicesSummary->setText(
+        QString("<b>Vista actual:</b> %1 &nbsp;|&nbsp; <b>Servicios listados:</b> %2 &nbsp;|&nbsp; "
+                "<b>En ejecución:</b> %3 &nbsp;|&nbsp; <b>Habilitados en el arranque (+x):</b> %4")
+            .arg(m_serviceAdvancedMode ? "Modo Avanzado (Control total)" : "Modo Estándar (Seguro para principiantes)")
+            .arg(m_cachedServices.size())
+            .arg(runningCount)
+            .arg(bootCount)
+    );
+
+    if (m_serviceAdvancedMode && m_txtLocalBootScriptEditor && m_comboLocalBootScript) {
+        const bool isShutdown = m_comboLocalBootScript->currentData().toBool();
+        m_txtLocalBootScriptEditor->setPlainText(ServiceManager::readLocalBootScript(isShutdown));
+    }
+
+    populateServicesTable();
+}
+
+void MainWindow::populateServicesTable()
+{
+    if (!m_tblServices) {
+        return;
+    }
+
+    QString previouslySelectedScript;
+    const QList<QTableWidgetItem *> selItems = m_tblServices->selectedItems();
+    if (!selItems.isEmpty()) {
+        previouslySelectedScript = selItems.first()->data(Qt::UserRole).toString();
+    }
+
+    const QString searchQuery = m_editServiceSearch ? m_editServiceSearch->text().trimmed() : QString();
+    const int categoryFilter = m_comboServiceCategoryFilter ? m_comboServiceCategoryFilter->currentData().toInt() : -1;
+
+    m_tblServices->blockSignals(true);
+    m_tblServices->setRowCount(0);
+
+    int rowToSelect = -1;
+
+    for (const SystemServiceInfo &svc : m_cachedServices) {
+        if (categoryFilter != -1 && static_cast<int>(svc.category) != categoryFilter) {
+            continue;
+        }
+
+        if (!searchQuery.isEmpty()) {
+            const bool matchesName = svc.displayName.contains(searchQuery, Qt::CaseInsensitive) ||
+                                     svc.scriptName.contains(searchQuery, Qt::CaseInsensitive) ||
+                                     svc.description.contains(searchQuery, Qt::CaseInsensitive);
+            if (!matchesName) {
+                continue;
+            }
+        }
+
+        const int row = m_tblServices->rowCount();
+        m_tblServices->insertRow(row);
+
+        if (!previouslySelectedScript.isEmpty() && svc.scriptName == previouslySelectedScript) {
+            rowToSelect = row;
+        }
+
+        // Columna 0: Nombre amigable + scriptName + etiquetas
+        QString nameCellText = QString("%1  (%2)").arg(svc.displayName, svc.scriptName);
+        if (svc.isCriticalBase) {
+            nameCellText.prepend("[SISTEMA BASE] ");
+        } else if (svc.isThirdParty) {
+            nameCellText.prepend("[SlackBuild] ");
+        }
+        if (!svc.conflictWarning.isEmpty()) {
+            nameCellText.append("  ⚠");
+        }
+
+        QTableWidgetItem *itemName = new QTableWidgetItem(nameCellText);
+        itemName->setData(Qt::UserRole, svc.scriptName);
+        itemName->setToolTip(svc.description);
+        if (svc.isCriticalBase) {
+            itemName->setForeground(QBrush(QColor("#842029")));
+            QFont f = itemName->font();
+            f.setBold(true);
+            itemName->setFont(f);
+        }
+        m_tblServices->setItem(row, 0, itemName);
+
+        // Columna 1: Categoría
+        QString catText;
+        switch (svc.category) {
+        case ServiceCategory::SystemBase:           catText = "Sistema Base"; break;
+        case ServiceCategory::NetworkSecurity:      catText = "Red y Seguridad"; break;
+        case ServiceCategory::DesktopHardware:      catText = "Escritorio y Hardware"; break;
+        case ServiceCategory::ServersDatabases:     catText = "Servidores / BD"; break;
+        case ServiceCategory::ThirdPartySlackBuild: catText = "SlackBuild / Terceros"; break;
+        }
+        QTableWidgetItem *itemCat = new QTableWidgetItem(catText);
+        itemCat->setTextAlignment(Qt::AlignCenter);
+        m_tblServices->setItem(row, 1, itemCat);
+
+        // Columna 2: Estado en ejecución
+        QTableWidgetItem *itemStatus = new QTableWidgetItem(
+            svc.isRunning ? "● En ejecución" : "○ Detenido"
+        );
+        itemStatus->setTextAlignment(Qt::AlignCenter);
+        QFont stFont = itemStatus->font();
+        stFont.setBold(svc.isRunning);
+        itemStatus->setFont(stFont);
+        itemStatus->setForeground(QBrush(QColor(svc.isRunning ? "#0f5132" : "#6c757d")));
+        m_tblServices->setItem(row, 2, itemStatus);
+
+        // Columna 3: Interruptor Arranque (+x / -x)
+        QWidget *bootCellWidget = new QWidget(m_tblServices);
+        QHBoxLayout *bootCellLayout = new QHBoxLayout(bootCellWidget);
+        bootCellLayout->setContentsMargins(6, 2, 6, 2);
+        bootCellLayout->setAlignment(Qt::AlignCenter);
+
+        QCheckBox *chkBoot = new QCheckBox(svc.bootEnabled ? "Sí (+x)" : "No (-x)", bootCellWidget);
+        chkBoot->setChecked(svc.bootEnabled);
+        chkBoot->setStyleSheet(svc.bootEnabled
+                                   ? "font-size: 11px; font-weight: bold; color: #084298;"
+                                   : "font-size: 11px; color: #495057;");
+        const QString scriptNameCopy = svc.scriptName;
+        connect(chkBoot, &QCheckBox::toggled, this, [this, scriptNameCopy](bool checked) {
+            handleServiceBootToggled(scriptNameCopy, checked);
+        });
+
+        bootCellLayout->addWidget(chkBoot);
+        m_tblServices->setCellWidget(row, 3, bootCellWidget);
+
+        // Columna 4: Botones Iniciar / Detener / Reiniciar
+        QWidget *actionsWidget = new QWidget(m_tblServices);
+        QHBoxLayout *actionsLayout = new QHBoxLayout(actionsWidget);
+        actionsLayout->setContentsMargins(4, 3, 4, 3);
+        actionsLayout->setSpacing(4);
+
+        QPushButton *btnStart = new QPushButton("Iniciar", actionsWidget);
+        btnStart->setEnabled(!svc.isRunning);
+        btnStart->setStyleSheet(
+            "QPushButton { background-color: #2e7d32; color: white; font-size: 11px; font-weight: bold; border-radius: 3px; padding: 3px 7px; }"
+            "QPushButton:disabled { background-color: #ced4da; color: #6c757d; }"
+        );
+
+        QPushButton *btnStop = new QPushButton("Detener", actionsWidget);
+        btnStop->setEnabled(svc.isRunning);
+        btnStop->setStyleSheet(
+            "QPushButton { background-color: #c62828; color: white; font-size: 11px; font-weight: bold; border-radius: 3px; padding: 3px 7px; }"
+            "QPushButton:disabled { background-color: #ced4da; color: #6c757d; }"
+        );
+
+        QPushButton *btnRestart = new QPushButton("Reiniciar", actionsWidget);
+        btnRestart->setStyleSheet(
+            "QPushButton { background-color: #0d6efd; color: white; font-size: 11px; font-weight: bold; border-radius: 3px; padding: 3px 7px; }"
+        );
+
+        connect(btnStart, &QPushButton::clicked, this, [this, scriptNameCopy]() {
+            handleServiceActionClicked(scriptNameCopy, ServiceAction::Start);
+        });
+        connect(btnStop, &QPushButton::clicked, this, [this, scriptNameCopy]() {
+            handleServiceActionClicked(scriptNameCopy, ServiceAction::Stop);
+        });
+        connect(btnRestart, &QPushButton::clicked, this, [this, scriptNameCopy]() {
+            handleServiceActionClicked(scriptNameCopy, ServiceAction::Restart);
+        });
+
+        actionsLayout->addWidget(btnStart);
+        actionsLayout->addWidget(btnStop);
+        actionsLayout->addWidget(btnRestart);
+        m_tblServices->setCellWidget(row, 4, actionsWidget);
+    }
+
+    m_tblServices->blockSignals(false);
+
+    if (rowToSelect >= 0) {
+        m_tblServices->selectRow(rowToSelect);
+    } else if (m_tblServices->rowCount() > 0) {
+        m_tblServices->selectRow(0);
+    } else {
+        onServiceTableSelectionChanged();
+    }
+}
+
+void MainWindow::onRefreshServicesClicked()
+{
+    if (m_lblServiceFeedback) {
+        m_lblServiceFeedback->setVisible(false);
+    }
+    refreshServicesPage();
+}
+
+void MainWindow::onToggleAdvancedServicesClicked()
+{
+    if (!m_serviceAdvancedMode) {
+        const QMessageBox::StandardButton answer = QMessageBox::warning(
+            this,
+            "Advertencia — Zona de Cuidado",
+            ServiceManager::getAdvancedModeWarning() + "\n\n¿Deseas activar el Modo Avanzado?",
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No
+        );
+
+        if (answer != QMessageBox::Yes) {
+            return;
+        }
+
+        m_serviceAdvancedMode = true;
+        m_btnToggleAdvancedServices->setText("Volver a Modo Estándar");
+        m_btnToggleAdvancedServices->setStyleSheet(
+            "QPushButton { background-color: #c62828; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+            "QPushButton:hover { background-color: #8e0000; }"
+        );
+
+        if (m_comboServiceCategoryFilter && m_comboServiceCategoryFilter->findData(static_cast<int>(ServiceCategory::SystemBase)) < 0) {
+            m_comboServiceCategoryFilter->addItem("Sistema Base (Críticos)", static_cast<int>(ServiceCategory::SystemBase));
+        }
+    } else {
+        m_serviceAdvancedMode = false;
+        m_btnToggleAdvancedServices->setText("Configuración Avanzada");
+        m_btnToggleAdvancedServices->setStyleSheet(
+            "QPushButton { background-color: #495057; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+            "QPushButton:hover { background-color: #343a40; }"
+        );
+
+        if (m_comboServiceCategoryFilter) {
+            const int baseIdx = m_comboServiceCategoryFilter->findData(static_cast<int>(ServiceCategory::SystemBase));
+            if (baseIdx >= 0) {
+                m_comboServiceCategoryFilter->removeItem(baseIdx);
+            }
+        }
+    }
+
+    if (m_serviceDangerBanner) {
+        m_serviceDangerBanner->setVisible(m_serviceAdvancedMode);
+    }
+    if (m_serviceAdvancedPanel) {
+        m_serviceAdvancedPanel->setVisible(m_serviceAdvancedMode);
+    }
+
+    refreshServicesPage();
+}
+
+void MainWindow::onServiceFilterChanged()
+{
+    populateServicesTable();
+}
+
+void MainWindow::onServiceTableSelectionChanged()
+{
+    if (!m_tblServices || !m_lblServiceDetailTitle || !m_lblServiceDetailDesc) {
+        return;
+    }
+
+    const QList<QTableWidgetItem *> sel = m_tblServices->selectedItems();
+    if (sel.isEmpty()) {
+        m_lblServiceDetailTitle->setText("Ningún servicio seleccionado");
+        m_lblServiceDetailDesc->setText("No hay servicios que coincidan con el filtro actual.");
+        if (m_lblServiceConflictAlert) {
+            m_lblServiceConflictAlert->setVisible(false);
+        }
+        if (m_btnConfigureSamba) {
+            m_btnConfigureSamba->setVisible(false);
+        }
+        return;
+    }
+
+    const QString scriptName = sel.first()->data(Qt::UserRole).toString();
+    const SystemServiceInfo info = ServiceManager::inspectService(scriptName);
+
+    m_lblServiceDetailTitle->setText(
+        QString("%1  —  Ruta: %2").arg(info.displayName, info.scriptPath)
+    );
+    m_lblServiceDetailDesc->setText(
+        QString("%1<br><b>Acciones soportadas por el script:</b> %2 &nbsp;|&nbsp; "
+                "<b>Permiso de arranque actual:</b> %3")
+            .arg(info.description,
+                 info.supportedActions.join(", "),
+                 info.bootEnabled ? "Ejecutable (chmod +x)" : "No ejecutable (chmod -x)")
+    );
+
+    if (m_lblServiceConflictAlert) {
+        if (!info.conflictWarning.isEmpty()) {
+            m_lblServiceConflictAlert->setText("⚠ " + info.conflictWarning);
+            m_lblServiceConflictAlert->setVisible(true);
+        } else {
+            m_lblServiceConflictAlert->setVisible(false);
+        }
+    }
+
+    if (m_btnConfigureSamba) {
+        m_btnConfigureSamba->setVisible(scriptName == "rc.samba");
+    }
+
+    if (m_serviceAdvancedMode && m_lblScriptViewerHeader && m_txtServiceScriptViewer) {
+        m_lblScriptViewerHeader->setText(QString("Contenido en solo lectura de %1:").arg(info.scriptPath));
+        m_txtServiceScriptViewer->setPlainText(ServiceManager::readServiceScript(scriptName));
+    }
+}
+
+void MainWindow::onConfigureSambaClicked()
+{
+    SambaDetectedResources res = ServiceManager::detectSambaResources();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("Asistente de Configuración de Samba (SMB)");
+    dlg.setMinimumWidth(580);
+
+    QVBoxLayout *layout = new QVBoxLayout(&dlg);
+    layout->setSpacing(12);
+
+    QLabel *lblInfo = new QLabel(
+        "Configura los recursos compartidos de red (Samba) para tu equipo Slackware. "
+        "Esto generará un archivo /etc/samba/smb.conf limpio y optimizado a partir de los discos e impresoras detectados.",
+        &dlg
+    );
+    lblInfo->setWordWrap(true);
+
+    QFormLayout *form = new QFormLayout();
+    QLineEdit *editWorkgroup = new QLineEdit("WORKGROUP", &dlg);
+    editWorkgroup->setMinimumHeight(28);
+    form->addRow("Grupo de trabajo (Workgroup):", editWorkgroup);
+
+    QCheckBox *chkSharePrinters = new QCheckBox("Compartir impresoras del sistema (CUPS)", &dlg);
+    chkSharePrinters->setChecked(res.cupsAvailable);
+    chkSharePrinters->setEnabled(res.cupsAvailable);
+    form->addRow("", chkSharePrinters);
+
+    layout->addWidget(lblInfo);
+    layout->addLayout(form);
+
+    QLabel *lblSharesTitle = new QLabel("<b>Carpetas compartidas detectadas en el sistema:</b>", &dlg);
+    layout->addWidget(lblSharesTitle);
+
+    QTableWidget *tblShares = new QTableWidget(&dlg);
+    tblShares->setColumnCount(4);
+    tblShares->setHorizontalHeaderLabels({ "Nombre del recurso", "Ruta en el disco", "Solo lectura", "Invitados (Guest)" });
+    tblShares->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    tblShares->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    tblShares->setMinimumHeight(160);
+
+    for (const QString &mountInfo : res.detectedStorageMounts) {
+        QStringList parts = mountInfo.split('|');
+        if (!parts.isEmpty()) {
+            QString path = parts[0];
+            QString shareName = QFileInfo(path).fileName();
+            if (shareName.isEmpty()) {
+                shareName = "compartido";
+            }
+
+            int row = tblShares->rowCount();
+            tblShares->insertRow(row);
+            tblShares->setItem(row, 0, new QTableWidgetItem(shareName));
+            tblShares->setItem(row, 1, new QTableWidgetItem(path));
+
+            QTableWidgetItem *itemRo = new QTableWidgetItem();
+            itemRo->setCheckState(Qt::Unchecked);
+            tblShares->setItem(row, 2, itemRo);
+
+            QTableWidgetItem *itemGuest = new QTableWidgetItem();
+            itemGuest->setCheckState(Qt::Checked);
+            tblShares->setItem(row, 3, itemGuest);
+        }
+    }
+
+    if (tblShares->rowCount() == 0) {
+        int row = tblShares->rowCount();
+        tblShares->insertRow(row);
+        tblShares->setItem(row, 0, new QTableWidgetItem("publico"));
+        tblShares->setItem(row, 1, new QTableWidgetItem("/home/shared"));
+        QTableWidgetItem *itemRo = new QTableWidgetItem();
+        itemRo->setCheckState(Qt::Unchecked);
+        tblShares->setItem(row, 2, itemRo);
+        QTableWidgetItem *itemGuest = new QTableWidgetItem();
+        itemGuest->setCheckState(Qt::Checked);
+        tblShares->setItem(row, 3, itemGuest);
+    }
+
+    layout->addWidget(tblShares);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar /etc/samba/smb.conf");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    layout->addWidget(btnBox);
+
+    if (dlg.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    QString workgroup = editWorkgroup->text().trimmed();
+    bool sharePrinters = chkSharePrinters->isChecked();
+    QList<SambaShareItem> shares;
+
+    for (int i = 0; i < tblShares->rowCount(); ++i) {
+        QTableWidgetItem *itemSName = tblShares->item(i, 0);
+        QTableWidgetItem *itemPath = tblShares->item(i, 1);
+        QTableWidgetItem *itemRo = tblShares->item(i, 2);
+        QTableWidgetItem *itemGuest = tblShares->item(i, 3);
+
+        if (itemSName && itemPath && !itemSName->text().trimmed().isEmpty() && !itemPath->text().trimmed().isEmpty()) {
+            SambaShareItem share;
+            share.shareName = itemSName->text().trimmed();
+            share.path = itemPath->text().trimmed();
+            share.readOnly = (itemRo && itemRo->checkState() == Qt::Checked);
+            share.guestOk = (itemGuest && itemGuest->checkState() == Qt::Checked);
+            shares.append(share);
+        }
+    }
+
+    QString rootPass;
+    if (!promptRootPassword("Guardar configuración de Samba (/etc/samba/smb.conf)", rootPass)) {
+        return;
+    }
+
+    ServiceOperationResult resOp = ServiceManager::generateBasicSambaConfig(workgroup, sharePrinters, shares, rootPass);
+    rootPass.fill(QChar('\0'));
+    rootPass.clear();
+
+    if (m_lblServiceFeedback) {
+        m_lblServiceFeedback->setVisible(true);
+        if (resOp.success) {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(resOp.message);
+        } else {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(resOp.message);
+        }
+    }
+
+    refreshServicesPage();
+}
+
+bool MainWindow::promptRootPassword(const QString &actionSummary, QString &outPassword)
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle("Autorización de Administrador (root)");
+    dialog.setMinimumWidth(420);
+
+    QVBoxLayout *dlgLayout = new QVBoxLayout(&dialog);
+    dlgLayout->setSpacing(10);
+
+    QLabel *lblHeader = new QLabel(
+        "<b>Confirmación de seguridad obligatoria</b><br>"
+        "Por seguridad, toda modificación sobre los servicios del sistema requiere la contraseña de <b>root</b>.",
+        &dialog
+    );
+    lblHeader->setWordWrap(true);
+    lblHeader->setStyleSheet("font-size: 13px;");
+
+    QLabel *lblAction = new QLabel(QString("<b>Acción solicitada:</b> %1").arg(actionSummary), &dialog);
+    lblAction->setWordWrap(true);
+    lblAction->setStyleSheet(
+        "background-color: #eef4fa; color: #084298; border: 1px solid #b6d4fe; "
+        "border-radius: 4px; padding: 8px; font-size: 12px;"
+    );
+
+    QLineEdit *editPass = new QLineEdit(&dialog);
+    editPass->setEchoMode(QLineEdit::Password);
+    editPass->setMinimumHeight(32);
+    editPass->setPlaceholderText("Ingresa la contraseña de root...");
+
+    QCheckBox *chkShow = new QCheckBox("Mostrar contraseña", &dialog);
+    chkShow->setStyleSheet("font-size: 12px;");
+    connect(chkShow, &QCheckBox::toggled, editPass, [editPass](bool checked) {
+        editPass->setEchoMode(checked ? QLineEdit::Normal : QLineEdit::Password);
+    });
+
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
+        &dialog
+    );
+    buttonBox->button(QDialogButtonBox::Ok)->setText("Autorizar y ejecutar");
+    buttonBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+
+    connect(buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    dlgLayout->addWidget(lblHeader);
+    dlgLayout->addWidget(lblAction);
+    dlgLayout->addWidget(editPass);
+    dlgLayout->addWidget(chkShow);
+    dlgLayout->addWidget(buttonBox);
+
+    editPass->setFocus();
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return false;
+    }
+
+    outPassword = editPass->text();
+    editPass->clear();
+    return true;
+}
+
+void MainWindow::handleServiceBootToggled(const QString &scriptName, bool enable)
+{
+    const QString actionDesc = QString("%1 arranque automático (chmod %2) para <b>%3</b>")
+                                   .arg(enable ? "Habilitar" : "Deshabilitar",
+                                        enable ? "+x" : "-x",
+                                        scriptName);
+
+    QString rootPass;
+    if (!promptRootPassword(actionDesc, rootPass)) {
+        // Restaurar estado visual del checkbox si el usuario cancela
+        refreshServicesPage();
+        return;
+    }
+
+    const ServiceOperationResult res = ServiceManager::setStartOnBoot(
+        scriptName,
+        enable,
+        rootPass,
+        m_serviceAdvancedMode
+    );
+    rootPass.fill(QChar('\0'));
+    rootPass.clear();
+
+    if (m_lblServiceFeedback) {
+        m_lblServiceFeedback->setVisible(true);
+        if (res.success) {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(res.message);
+        } else {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(res.message);
+        }
+    }
+
+    refreshServicesPage();
+}
+
+void MainWindow::handleServiceActionClicked(const QString &scriptName, ServiceAction action)
+{
+    QString verb = "Reiniciar";
+    if (action == ServiceAction::Start) {
+        verb = "Iniciar";
+    } else if (action == ServiceAction::Stop) {
+        verb = "Detener";
+    }
+
+    const QString actionDesc = QString("%1 ahora mismo el servicio <b>%2</b>").arg(verb, scriptName);
+
+    QString rootPass;
+    if (!promptRootPassword(actionDesc, rootPass)) {
+        return;
+    }
+
+    const ServiceOperationResult res = ServiceManager::executeServiceAction(
+        scriptName,
+        action,
+        rootPass,
+        m_serviceAdvancedMode
+    );
+    rootPass.fill(QChar('\0'));
+    rootPass.clear();
+
+    if (m_lblServiceFeedback) {
+        m_lblServiceFeedback->setVisible(true);
+        if (res.success) {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            const QString extra = res.commandOutput.isEmpty() ? QString() : QString("\nSalida: %1").arg(res.commandOutput);
+            m_lblServiceFeedback->setText(res.message + extra);
+        } else {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(res.message);
+        }
+    }
+
+    refreshServicesPage();
+}
+
+void MainWindow::handleApplyServicePreset(ServicePreset preset, const QString &presetLabel)
+{
+    const QList<ServicePresetChange> preview = ServiceManager::previewPreset(preset);
+    if (preview.isEmpty()) {
+        QMessageBox::information(
+            this,
+            presetLabel,
+            "Tu sistema ya tiene aplicados todos los servicios recomendados para este perfil."
+        );
+        return;
+    }
+
+    QStringList summaryLines;
+    for (const ServicePresetChange &chg : preview) {
+        summaryLines << QString("• %1 (%2): arranque %3%4 — %5")
+                            .arg(chg.displayName,
+                                 chg.scriptName,
+                                 chg.enableOnBoot ? "habilitado (+x)" : "deshabilitado (-x)",
+                                 chg.startNow ? " e iniciar ahora" : "",
+                                 chg.reason);
+    }
+
+    const QMessageBox::StandardButton confirm = QMessageBox::question(
+        this,
+        QString("Vista previa — %1").arg(presetLabel),
+        QString("Se aplicarán los siguientes cambios en /etc/rc.d/:\n\n%1\n\n¿Deseas continuar?")
+            .arg(summaryLines.join('\n')),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::Yes
+    );
+
+    if (confirm != QMessageBox::Yes) {
+        return;
+    }
+
+    QString rootPass;
+    if (!promptRootPassword(QString("Aplicar <b>%1</b> (%2 cambios)").arg(presetLabel).arg(preview.size()), rootPass)) {
+        return;
+    }
+
+    const ServiceOperationResult res = ServiceManager::applyPreset(preset, rootPass);
+    rootPass.fill(QChar('\0'));
+    rootPass.clear();
+
+    if (m_lblServiceFeedback) {
+        m_lblServiceFeedback->setVisible(true);
+        if (res.success) {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(res.message);
+        } else {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(res.message);
+        }
+    }
+
+    refreshServicesPage();
+}
+
+void MainWindow::onApplyServicePresetDesktopClicked()
+{
+    handleApplyServicePreset(ServicePreset::DesktopLaptop, "Perfil Laptop / Escritorio");
+}
+
+void MainWindow::onApplyServicePresetServerClicked()
+{
+    handleApplyServicePreset(ServicePreset::ServerDevelopment, "Perfil Servidor / Desarrollo");
+}
+
+void MainWindow::onLocalBootScriptSelectorChanged(int index)
+{
+    Q_UNUSED(index);
+    if (!m_comboLocalBootScript || !m_txtLocalBootScriptEditor) {
+        return;
+    }
+    const bool isShutdown = m_comboLocalBootScript->currentData().toBool();
+    m_txtLocalBootScriptEditor->setPlainText(ServiceManager::readLocalBootScript(isShutdown));
+}
+
+void MainWindow::onSaveLocalBootScriptClicked()
+{
+    if (!m_comboLocalBootScript || !m_txtLocalBootScriptEditor) {
+        return;
+    }
+
+    const bool isShutdown = m_comboLocalBootScript->currentData().toBool();
+    const QString targetFile = isShutdown ? "/etc/rc.d/rc.local_shutdown" : "/etc/rc.d/rc.local";
+
+    QString rootPass;
+    if (!promptRootPassword(QString("Guardar cambios en <b>%1</b>").arg(targetFile), rootPass)) {
+        return;
+    }
+
+    const ServiceOperationResult res = ServiceManager::saveLocalBootScript(
+        m_txtLocalBootScriptEditor->toPlainText(),
+        isShutdown,
+        rootPass
+    );
+    rootPass.fill(QChar('\0'));
+    rootPass.clear();
+
+    if (m_lblServiceFeedback) {
+        m_lblServiceFeedback->setVisible(true);
+        if (res.success) {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(res.message);
+        } else {
+            m_lblServiceFeedback->setStyleSheet(
+                "QLabel { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblServiceFeedback->setText(res.message);
+        }
+    }
+}
+
 QWidget* MainWindow::createModulePlaceholderPage(const QString &title,
                                                  const QString &subtitle,
                                                  const QString &targetFiles)
@@ -3276,6 +4327,11 @@ void MainWindow::onNavigationChanged(int index)
             m_lblTimeFeedback->setVisible(false);
         }
         refreshTimePage();
+    } else if (index == 9) {
+        if (m_lblServiceFeedback) {
+            m_lblServiceFeedback->setVisible(false);
+        }
+        refreshServicesPage();
     }
 
     m_pagesStack->setCurrentIndex(index);

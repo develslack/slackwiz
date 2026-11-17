@@ -37,7 +37,7 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = slackwiz1.0.0
-DISTDIR = /mnt/storage/desarrollo/QT/slackwiz/build/.obj/slackwiz1.0.0
+DISTDIR = /home/augusto/projects/QT/slackwiz/build/.obj/slackwiz1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-rpath,/usr/lib64
 LIBS          = $(SUBLIBS) /usr/lib64/libQt5Widgets.so /usr/lib64/libQt5Gui.so /usr/lib64/libQt5Network.so /usr/lib64/libQt5Core.so -lGL -lpthread   
@@ -63,6 +63,7 @@ SOURCES       = src/main.cpp \
 		src/modules/webServerManager.cpp \
 		src/modules/databaseManager.cpp \
 		src/modules/timeManager.cpp \
+		src/modules/ServiceManager.cpp \
 		src/ui/timezoneMapWidget.cpp \
 		src/ui/timeConfigWidget.cpp \
 		src/ui/mainWindow.cpp build/.moc/moc_timezoneMapWidget.cpp \
@@ -79,6 +80,7 @@ OBJECTS       = build/.obj/main.o \
 		build/.obj/webServerManager.o \
 		build/.obj/databaseManager.o \
 		build/.obj/timeManager.o \
+		build/.obj/ServiceManager.o \
 		build/.obj/timezoneMapWidget.o \
 		build/.obj/timeConfigWidget.o \
 		build/.obj/mainWindow.o \
@@ -457,6 +459,7 @@ DIST          = /usr/lib64/qt5/mkspecs/features/spec_pre.prf \
 		src/modules/webServerManager.h \
 		src/modules/databaseManager.h \
 		src/modules/timeManager.h \
+		src/modules/ServiceManager.h \
 		src/ui/timezoneMapWidget.h \
 		src/ui/timeConfigWidget.h \
 		src/ui/mainWindow.h src/main.cpp \
@@ -470,6 +473,7 @@ DIST          = /usr/lib64/qt5/mkspecs/features/spec_pre.prf \
 		src/modules/webServerManager.cpp \
 		src/modules/databaseManager.cpp \
 		src/modules/timeManager.cpp \
+		src/modules/ServiceManager.cpp \
 		src/ui/timezoneMapWidget.cpp \
 		src/ui/timeConfigWidget.cpp \
 		src/ui/mainWindow.cpp
@@ -1227,8 +1231,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /usr/lib64/qt5/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents src/core/logger.h src/core/commandRunner.h src/modules/localeManager.h src/modules/keyboardManager.h src/modules/userManager.h src/modules/groupManager.h src/modules/sudoManager.h src/modules/webServerManager.h src/modules/databaseManager.h src/modules/timeManager.h src/ui/timezoneMapWidget.h src/ui/timeConfigWidget.h src/ui/mainWindow.h $(DISTDIR)/
-	$(COPY_FILE) --parents src/main.cpp src/core/logger.cpp src/core/commandRunner.cpp src/modules/localeManager.cpp src/modules/keyboardManager.cpp src/modules/userManager.cpp src/modules/groupManager.cpp src/modules/sudoManager.cpp src/modules/webServerManager.cpp src/modules/databaseManager.cpp src/modules/timeManager.cpp src/ui/timezoneMapWidget.cpp src/ui/timeConfigWidget.cpp src/ui/mainWindow.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents src/core/logger.h src/core/commandRunner.h src/modules/localeManager.h src/modules/keyboardManager.h src/modules/userManager.h src/modules/groupManager.h src/modules/sudoManager.h src/modules/webServerManager.h src/modules/databaseManager.h src/modules/timeManager.h src/modules/ServiceManager.h src/ui/timezoneMapWidget.h src/ui/timeConfigWidget.h src/ui/mainWindow.h $(DISTDIR)/
+	$(COPY_FILE) --parents src/main.cpp src/core/logger.cpp src/core/commandRunner.cpp src/modules/localeManager.cpp src/modules/keyboardManager.cpp src/modules/userManager.cpp src/modules/groupManager.cpp src/modules/sudoManager.cpp src/modules/webServerManager.cpp src/modules/databaseManager.cpp src/modules/timeManager.cpp src/modules/ServiceManager.cpp src/ui/timezoneMapWidget.cpp src/ui/timeConfigWidget.cpp src/ui/mainWindow.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -1267,21 +1271,22 @@ build/.moc/moc_timezoneMapWidget.cpp: src/ui/timezoneMapWidget.h \
 		src/modules/timeManager.h \
 		build/.moc/moc_predefs.h \
 		/usr/lib64/qt5/bin/moc
-	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/desarrollo/QT/slackwiz -I/mnt/storage/desarrollo/QT/slackwiz/src -I/mnt/storage/desarrollo/QT/slackwiz/src/core -I/mnt/storage/desarrollo/QT/slackwiz/src/ui -I/mnt/storage/desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timezoneMapWidget.h -o build/.moc/moc_timezoneMapWidget.cpp
+	/usr/lib64/qt5/bin/moc $(DEFINES) --include /home/augusto/projects/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/home/augusto/projects/QT/slackwiz -I/home/augusto/projects/QT/slackwiz/src -I/home/augusto/projects/QT/slackwiz/src/core -I/home/augusto/projects/QT/slackwiz/src/ui -I/home/augusto/projects/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timezoneMapWidget.h -o build/.moc/moc_timezoneMapWidget.cpp
 
 build/.moc/moc_timeConfigWidget.cpp: src/ui/timeConfigWidget.h \
 		src/ui/timezoneMapWidget.h \
 		src/modules/timeManager.h \
 		build/.moc/moc_predefs.h \
 		/usr/lib64/qt5/bin/moc
-	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/desarrollo/QT/slackwiz -I/mnt/storage/desarrollo/QT/slackwiz/src -I/mnt/storage/desarrollo/QT/slackwiz/src/core -I/mnt/storage/desarrollo/QT/slackwiz/src/ui -I/mnt/storage/desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timeConfigWidget.h -o build/.moc/moc_timeConfigWidget.cpp
+	/usr/lib64/qt5/bin/moc $(DEFINES) --include /home/augusto/projects/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/home/augusto/projects/QT/slackwiz -I/home/augusto/projects/QT/slackwiz/src -I/home/augusto/projects/QT/slackwiz/src/core -I/home/augusto/projects/QT/slackwiz/src/ui -I/home/augusto/projects/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/timeConfigWidget.h -o build/.moc/moc_timeConfigWidget.cpp
 
 build/.moc/moc_mainWindow.cpp: src/ui/mainWindow.h \
 		src/modules/timeManager.h \
 		src/ui/timezoneMapWidget.h \
+		src/modules/ServiceManager.h \
 		build/.moc/moc_predefs.h \
 		/usr/lib64/qt5/bin/moc
-	/usr/lib64/qt5/bin/moc $(DEFINES) --include /mnt/storage/desarrollo/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/mnt/storage/desarrollo/QT/slackwiz -I/mnt/storage/desarrollo/QT/slackwiz/src -I/mnt/storage/desarrollo/QT/slackwiz/src/core -I/mnt/storage/desarrollo/QT/slackwiz/src/ui -I/mnt/storage/desarrollo/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/mainWindow.h -o build/.moc/moc_mainWindow.cpp
+	/usr/lib64/qt5/bin/moc $(DEFINES) --include /home/augusto/projects/QT/slackwiz/build/.moc/moc_predefs.h -I/usr/lib64/qt5/mkspecs/linux-g++ -I/home/augusto/projects/QT/slackwiz -I/home/augusto/projects/QT/slackwiz/src -I/home/augusto/projects/QT/slackwiz/src/core -I/home/augusto/projects/QT/slackwiz/src/ui -I/home/augusto/projects/QT/slackwiz/src/modules -I/usr/include/qt5 -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui -I/usr/include/qt5/QtNetwork -I/usr/include/qt5/QtCore -I/usr/include/c++/11.2.0 -I/usr/include/c++/11.2.0/x86_64-slackware-linux -I/usr/include/c++/11.2.0/backward -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include -I/usr/local/include -I/usr/lib64/gcc/x86_64-slackware-linux/11.2.0/include-fixed -I/usr/include src/ui/mainWindow.h -o build/.moc/moc_mainWindow.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -1302,6 +1307,7 @@ compiler_clean: compiler_moc_predefs_clean compiler_moc_header_clean
 build/.obj/main.o: src/main.cpp src/ui/mainWindow.h \
 		src/modules/timeManager.h \
 		src/ui/timezoneMapWidget.h \
+		src/modules/ServiceManager.h \
 		src/core/logger.h \
 		src/core/commandRunner.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o build/.obj/main.o src/main.cpp
@@ -1354,6 +1360,11 @@ build/.obj/timeManager.o: src/modules/timeManager.cpp src/modules/timeManager.h 
 		src/core/logger.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o build/.obj/timeManager.o src/modules/timeManager.cpp
 
+build/.obj/ServiceManager.o: src/modules/ServiceManager.cpp src/modules/ServiceManager.h \
+		src/core/logger.h \
+		src/core/commandRunner.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o build/.obj/ServiceManager.o src/modules/ServiceManager.cpp
+
 build/.obj/timezoneMapWidget.o: src/ui/timezoneMapWidget.cpp src/ui/timezoneMapWidget.h \
 		src/modules/timeManager.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o build/.obj/timezoneMapWidget.o src/ui/timezoneMapWidget.cpp
@@ -1366,6 +1377,7 @@ build/.obj/timeConfigWidget.o: src/ui/timeConfigWidget.cpp src/ui/timeConfigWidg
 build/.obj/mainWindow.o: src/ui/mainWindow.cpp src/ui/mainWindow.h \
 		src/modules/timeManager.h \
 		src/ui/timezoneMapWidget.h \
+		src/modules/ServiceManager.h \
 		src/core/logger.h \
 		src/core/commandRunner.h \
 		src/modules/localeManager.h \
@@ -1389,17 +1401,17 @@ build/.obj/moc_mainWindow.o: build/.moc/moc_mainWindow.cpp
 ####### Install
 
 install_target: first FORCE
-	@test -d $(INSTALL_ROOT)/usr/local/bin || mkdir -p $(INSTALL_ROOT)/usr/local/bin
-	$(QINSTALL_PROGRAM) build/$(QMAKE_TARGET) $(INSTALL_ROOT)/usr/local/bin/$(QMAKE_TARGET)
+	@test -d $(INSTALL_ROOT)/usr/local/bin/slackwiz || mkdir -p $(INSTALL_ROOT)/usr/local/bin/slackwiz
+	$(QINSTALL_PROGRAM) build/$(QMAKE_TARGET) $(INSTALL_ROOT)/usr/local/bin/slackwiz/$(QMAKE_TARGET)
 
 uninstall_target: FORCE
-	-$(DEL_FILE) $(INSTALL_ROOT)/usr/local/bin/$(QMAKE_TARGET)
-	-$(DEL_DIR) $(INSTALL_ROOT)/usr/local/bin/ 
+	-$(DEL_FILE) $(INSTALL_ROOT)/usr/local/bin/slackwiz/$(QMAKE_TARGET)
+	-$(DEL_DIR) $(INSTALL_ROOT)/usr/local/bin/slackwiz/ 
 
 
 install_desktop: first FORCE
 	@test -d $(INSTALL_ROOT)/usr/local/share/applications || mkdir -p $(INSTALL_ROOT)/usr/local/share/applications
-	$(QINSTALL) /mnt/storage/desarrollo/QT/slackwiz/resources/slackwiz.desktop $(INSTALL_ROOT)/usr/local/share/applications/slackwiz.desktop
+	$(QINSTALL) /home/augusto/projects/QT/slackwiz/resources/slackwiz.desktop $(INSTALL_ROOT)/usr/local/share/applications/slackwiz.desktop
 
 uninstall_desktop: FORCE
 	-$(DEL_FILE) -r $(INSTALL_ROOT)/usr/local/share/applications/slackwiz.desktop

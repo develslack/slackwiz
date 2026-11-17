@@ -17,6 +17,8 @@
 #include <QFrame>
 #include <QTextBrowser>
 #include <QPlainTextEdit>
+#include <QTableWidget>
+#include <QTabWidget>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTimer>
@@ -25,6 +27,7 @@
 
 #include "timeManager.h"
 #include "timezoneMapWidget.h"
+#include "ServiceManager.h"
 
 class MainWindow : public QMainWindow
 {
@@ -95,6 +98,17 @@ private slots:
     void updateTimeLivePreview();
     void onSaveTimeConfigClicked();
 
+    // Módulo 9: Gestor Visual de Servicios (rc.d) + Asistente Samba
+    void onRefreshServicesClicked();
+    void onToggleAdvancedServicesClicked();
+    void onServiceFilterChanged();
+    void onServiceTableSelectionChanged();
+    void onApplyServicePresetDesktopClicked();
+    void onApplyServicePresetServerClicked();
+    void onLocalBootScriptSelectorChanged(int index);
+    void onSaveLocalBootScriptClicked();
+    void onConfigureSambaClicked();
+
 private:
     void setupUi();
     void setupNavigationMenu();
@@ -110,6 +124,12 @@ private:
     void loadUrlInEmbeddedBrowser(const QString &urlString);
     void refreshDatabasePage();
     void refreshTimePage();
+    void refreshServicesPage();
+    void populateServicesTable();
+    void handleServiceBootToggled(const QString &scriptName, bool enable);
+    void handleServiceActionClicked(const QString &scriptName, ServiceAction action);
+    void handleApplyServicePreset(ServicePreset preset, const QString &presetLabel);
+    bool promptRootPassword(const QString &actionSummary, QString &outPassword);
 
     QWidget* createWelcomePage();
     QWidget* createLocalePage();
@@ -120,6 +140,7 @@ private:
     QWidget* createWebServerPage();
     QWidget* createDatabasePage();
     QWidget* createTimePage();
+    QWidget* createServicesPage();
     QWidget* createModulePlaceholderPage(const QString &title,
                                          const QString &subtitle,
                                          const QString &targetFiles);
@@ -265,6 +286,31 @@ private:
     QTimer *m_timePreviewTimer;
     QList<TimezoneEntry> m_timeZonesList;
     bool m_syncingTimeSelection = false;
+
+    // Controles del Módulo 9: Gestor Visual de Servicios (rc.d) + Samba
+    QLabel *m_lblServicesSummary;
+    QPushButton *m_btnToggleAdvancedServices;
+    QPushButton *m_btnConfigureSamba;
+    QFrame *m_serviceDangerBanner;
+    QLineEdit *m_editServiceSearch;
+    QComboBox *m_comboServiceCategoryFilter;
+    QPushButton *m_btnPresetDesktopServices;
+    QPushButton *m_btnPresetServerServices;
+    QTableWidget *m_tblServices;
+    QFrame *m_serviceDetailBox;
+    QLabel *m_lblServiceDetailTitle;
+    QLabel *m_lblServiceDetailDesc;
+    QLabel *m_lblServiceConflictAlert;
+    QLabel *m_lblServiceFeedback;
+    QFrame *m_serviceAdvancedPanel;
+    QTabWidget *m_serviceAdvancedTabs;
+    QLabel *m_lblScriptViewerHeader;
+    QPlainTextEdit *m_txtServiceScriptViewer;
+    QComboBox *m_comboLocalBootScript;
+    QPlainTextEdit *m_txtLocalBootScriptEditor;
+    QPushButton *m_btnSaveLocalBootScript;
+    QList<SystemServiceInfo> m_cachedServices;
+    bool m_serviceAdvancedMode = false;
 };
 
 #endif // MAINWINDOW_H
