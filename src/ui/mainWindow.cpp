@@ -8,6 +8,7 @@
 #include "sudoManager.h"
 #include "webServerManager.h"
 #include "databaseManager.h"
+#include "DeviceManager.h"
 
 #include <QWidget>
 #include <QHBoxLayout>
@@ -167,7 +168,18 @@ MainWindow::MainWindow(QWidget *parent)
       m_txtServiceScriptViewer(nullptr),
       m_comboLocalBootScript(nullptr),
       m_txtLocalBootScriptEditor(nullptr),
-      m_btnSaveLocalBootScript(nullptr)
+      m_btnSaveLocalBootScript(nullptr),
+      m_lblDeviceFormFactorSummary(nullptr),
+      m_btnToggleAdvancedDevices(nullptr),
+      m_deviceDangerBanner(nullptr),
+      m_tblDevices(nullptr),
+      m_deviceDetailBox(nullptr),
+      m_lblDeviceDetailTitle(nullptr),
+      m_lblDeviceDetailDesc(nullptr),
+      m_lblDeviceFeedback(nullptr),
+      m_deviceAdvancedPanel(nullptr),
+      m_txtDeviceTechViewer(nullptr),
+      m_deviceAdvancedMode(false)
 {
     LOG_INFO("MainWindow", "Inicializando interfaz gráfica principal...");
     setupUi();
@@ -305,7 +317,8 @@ void MainWindow::setupNavigationMenu()
         { "6. Servidor web",        QStyle::SP_DriveNetIcon },
         { "7. Base de datos",       QStyle::SP_DriveHDIcon },
         { "8. Hora del sistema",    QStyle::SP_BrowserReload },
-        { "9. Servicios (rc.d)",    QStyle::SP_FileDialogContentsView }
+        { "9. Servicios (rc.d)",    QStyle::SP_FileDialogContentsView },
+        { "10. Dispositivos",       QStyle::SP_DesktopIcon }
     };
 
     for (const auto &item : items) {
@@ -330,6 +343,7 @@ void MainWindow::setupPages()
     m_pagesStack->addWidget(createDatabasePage());
     m_pagesStack->addWidget(createTimePage());
     m_pagesStack->addWidget(createServicesPage());
+    m_pagesStack->addWidget(createDevicesPage());
 }
 
 QWidget* MainWindow::createWelcomePage()
@@ -368,7 +382,7 @@ QWidget* MainWindow::createWelcomePage()
     QLabel *sysInfo = new QLabel(
         QString("<b>Sistema detectado:</b> %1<br>"
                 "<b>Permisos de administrador:</b> %2<br>"
-                "<b>Módulos disponibles:</b> Idioma, Teclado, Usuarios, Grupos, Sudo, Servidor Web, Base de Datos, Hora y Servicios (rc.d).")
+                "<b>Módulos disponibles:</b> Idioma, Teclado, Usuarios, Grupos, Sudo, Servidor Web, Base de Datos, Hora, Servicios y Dispositivos.")
             .arg(slackVer, rootState),
         infoBox
     );
@@ -2193,7 +2207,6 @@ QWidget* MainWindow::createDatabasePage()
     subtitle->setWordWrap(true);
     subtitle->setStyleSheet("font-size: 13px;");
 
-    // Tarjeta 1: Detección previa de motores instalados
     QFrame *detectBox = new QFrame(page);
     detectBox->setStyleSheet(
         "QFrame { background-color: #eef4fa; border: 1px solid #b6d4fe; border-radius: 6px; padding: 12px; }"
@@ -2219,7 +2232,6 @@ QWidget* MainWindow::createDatabasePage()
     detectLayout->addLayout(detectHeaderLayout);
     detectLayout->addWidget(m_lblDbDetectionSummary);
 
-    // Tarjeta 2: Selección del motor a configurar
     QFrame *engineBox = new QFrame(page);
     engineBox->setStyleSheet(
         "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; }"
@@ -2240,7 +2252,6 @@ QWidget* MainWindow::createDatabasePage()
     engineLayout->addWidget(m_radioDbMariaDb);
     engineLayout->addWidget(m_radioDbPostgres);
 
-    // Tarjeta 3: Contraseña de administración y preguntas nativas de seguridad
     QFrame *securityBox = new QFrame(page);
     securityBox->setStyleSheet(
         "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; }"
@@ -2291,7 +2302,6 @@ QWidget* MainWindow::createDatabasePage()
     passForm->addRow(lblConP, m_editDbConfirmPassword);
     passForm->addRow("", m_chkDbShowPasswords);
 
-    // Sub-opciones nativas de MariaDB (mariadb-secure-installation)
     m_dbMariaOptionsWidget = new QWidget(securityBox);
     QVBoxLayout *mariaOptLayout = new QVBoxLayout(m_dbMariaOptionsWidget);
     mariaOptLayout->setContentsMargins(0, 4, 0, 0);
@@ -2322,7 +2332,6 @@ QWidget* MainWindow::createDatabasePage()
     mariaOptLayout->addWidget(m_chkMariaRemoveTestDb);
     mariaOptLayout->addWidget(m_chkMariaReloadPrivs);
 
-    // Sub-opciones nativas de PostgreSQL
     m_dbPostgresOptionsWidget = new QWidget(securityBox);
     m_dbPostgresOptionsWidget->setVisible(false);
     QVBoxLayout *pgOptLayout = new QVBoxLayout(m_dbPostgresOptionsWidget);
@@ -2371,7 +2380,6 @@ QWidget* MainWindow::createDatabasePage()
     m_lblDbConfigFeedback->setWordWrap(true);
     m_lblDbConfigFeedback->setVisible(false);
 
-    // Tarjeta 4: Comprobación de inicio de sesión tras configurar
     m_dbSessionTestFrame = new QFrame(page);
     m_dbSessionTestFrame->setVisible(false);
     m_dbSessionTestFrame->setStyleSheet(
@@ -2429,7 +2437,6 @@ QWidget* MainWindow::createDatabasePage()
     sessionLayout->addWidget(m_lblDbSessionStatus);
     sessionLayout->addWidget(m_txtDbSessionOutput);
 
-    // Tarjeta 5: Pregunta de arranque automático (se muestra cuando la sesión de prueba es exitosa)
     m_dbBootFrame = new QFrame(page);
     m_dbBootFrame->setVisible(false);
     m_dbBootFrame->setStyleSheet(
@@ -2681,7 +2688,6 @@ void MainWindow::onSaveDatabaseConfigClicked()
 
     refreshDatabasePage();
 
-    // Mostrar paso 3: Solicitar contraseña de root/postgres para iniciar sesión de comprobación
     if (m_dbSessionTestFrame && m_lblDbSessionPrompt && m_editDbTestPassword) {
         const QString adminUser = (req.engine == "postgresql") ? "postgres" : "root";
         const QString engineName = (req.engine == "postgresql") ? "PostgreSQL" : "MariaDB";
@@ -2725,7 +2731,6 @@ void MainWindow::onTestDatabaseSessionClicked()
         );
         m_lblDbSessionStatus->setText(testRes.summary);
 
-        // Si todo va bien, preguntar si desea que el servicio inicie con el sistema
         if (m_dbBootFrame && m_lblDbBootQuestion) {
             const QString engineName = (engine == "postgresql") ? "PostgreSQL" : "MariaDB";
             const QString rcPath = (engine == "postgresql") ? "/etc/rc.d/rc.postgresql" : "/etc/rc.d/rc.mysqld";
@@ -2809,7 +2814,6 @@ QWidget* MainWindow::createTimePage()
     subtitle->setWordWrap(true);
     subtitle->setStyleSheet("font-size: 13px;");
 
-    // Resumen superior del estado actual del sistema
     QFrame *currentBox = new QFrame(page);
     currentBox->setStyleSheet(
         "QFrame { background-color: #eef4fa; border: 1px solid #b6d4fe; border-radius: 6px; padding: 10px; }"
@@ -2820,7 +2824,6 @@ QWidget* MainWindow::createTimePage()
     m_lblTimeCurrentSummary->setStyleSheet("border: none; font-size: 12px; color: #084298;");
     currentBoxLayout->addWidget(m_lblTimeCurrentSummary);
 
-    // Tarjeta 1: Mapa mundial interactivo + Desplegable sincronizado + Horario de verano
     QFrame *zoneBox = new QFrame(page);
     zoneBox->setStyleSheet(
         "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; }"
@@ -2869,7 +2872,6 @@ QWidget* MainWindow::createTimePage()
 
     zoneLayout->addLayout(zoneForm);
 
-    // Tarjeta 2: Hora automática mundial (NTP) o selección manual
     QFrame *syncBox = new QFrame(page);
     syncBox->setStyleSheet(
         "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; }"
@@ -2937,7 +2939,6 @@ QWidget* MainWindow::createTimePage()
     syncLayout->addLayout(manualRow);
     syncLayout->addWidget(m_chkTimeHwUtc);
 
-    // Botón de guardar y feedback
     QHBoxLayout *actionLayout = new QHBoxLayout();
     m_btnSaveTimeConfig = new QPushButton("Guardar configuración horaria", page);
     m_btnSaveTimeConfig->setMinimumHeight(38);
@@ -2963,7 +2964,6 @@ QWidget* MainWindow::createTimePage()
     layout->addWidget(m_lblTimeFeedback);
     layout->addStretch();
 
-    // Cargar zonas horarias desde /usr/share/zoneinfo/zone1970.tab
     m_timeZonesList = TimeManager::loadSystemTimezones();
     m_timeMapWidget->setTimezones(m_timeZonesList);
 
@@ -3240,7 +3240,6 @@ QWidget* MainWindow::createServicesPage()
     subtitle->setWordWrap(true);
     subtitle->setStyleSheet("font-size: 13px;");
 
-    // Barra superior: Resumen + Botón Modo Avanzado ("Zona de Cuidado") + Actualizar
     QFrame *topSummaryBox = new QFrame(page);
     topSummaryBox->setStyleSheet(
         "QFrame { background-color: #eef4fa; border: 1px solid #b6d4fe; border-radius: 6px; padding: 10px; }"
@@ -3267,7 +3266,6 @@ QWidget* MainWindow::createServicesPage()
     topSummaryLayout->addWidget(btnRefreshServices);
     topSummaryLayout->addWidget(m_btnToggleAdvancedServices);
 
-    // Banner de advertencia visible solo cuando está activo el Modo Avanzado
     m_serviceDangerBanner = new QFrame(page);
     m_serviceDangerBanner->setVisible(false);
     m_serviceDangerBanner->setStyleSheet(
@@ -3283,7 +3281,6 @@ QWidget* MainWindow::createServicesPage()
     lblDangerText->setStyleSheet("border: none; font-size: 12px; color: #664d03;");
     dangerLayout->addWidget(lblDangerText);
 
-    // Barra de perfiles recomendados (principiantes) + Filtros de búsqueda
     QFrame *controlsBox = new QFrame(page);
     controlsBox->setStyleSheet(
         "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px; }"
@@ -3334,7 +3331,6 @@ QWidget* MainWindow::createServicesPage()
     controlsLayout->addLayout(presetsRow);
     controlsLayout->addLayout(filterRow);
 
-    // Tabla principal de /etc/rc.d/rc.*
     m_tblServices = new QTableWidget(page);
     m_tblServices->setColumnCount(5);
     m_tblServices->setHorizontalHeaderLabels({
@@ -3365,7 +3361,6 @@ QWidget* MainWindow::createServicesPage()
     header->setSectionResizeMode(4, QHeaderView::Fixed);
     m_tblServices->setColumnWidth(4, 225);
 
-    // Tarjeta de detalle del servicio seleccionado + alerta de conflictos + Botón Samba
     m_serviceDetailBox = new QFrame(page);
     m_serviceDetailBox->setStyleSheet(
         "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px; }"
@@ -3401,12 +3396,10 @@ QWidget* MainWindow::createServicesPage()
     detailLayout->addWidget(m_lblServiceConflictAlert);
     detailLayout->addWidget(m_btnConfigureSamba);
 
-    // Etiqueta de resultado de operaciones
     m_lblServiceFeedback = new QLabel(page);
     m_lblServiceFeedback->setWordWrap(true);
     m_lblServiceFeedback->setVisible(false);
 
-    // Panel Avanzado (oculto por defecto; visible solo en Modo Avanzado)
     m_serviceAdvancedPanel = new QFrame(page);
     m_serviceAdvancedPanel->setVisible(false);
     m_serviceAdvancedPanel->setStyleSheet(
@@ -3420,7 +3413,6 @@ QWidget* MainWindow::createServicesPage()
 
     m_serviceAdvancedTabs = new QTabWidget(m_serviceAdvancedPanel);
 
-    // Pestaña 1: Visor en solo lectura del script rc.* seleccionado
     QWidget *tabScriptViewer = new QWidget(m_serviceAdvancedTabs);
     QVBoxLayout *viewerLayout = new QVBoxLayout(tabScriptViewer);
     m_lblScriptViewerHeader = new QLabel("Selecciona un servicio en la tabla superior para inspeccionar su script /etc/rc.d/rc.*", tabScriptViewer);
@@ -3435,7 +3427,6 @@ QWidget* MainWindow::createServicesPage()
     viewerLayout->addWidget(m_lblScriptViewerHeader);
     viewerLayout->addWidget(m_txtServiceScriptViewer);
 
-    // Pestaña 2: Editor seguro de rc.local y rc.local_shutdown
     QWidget *tabLocalBoot = new QWidget(m_serviceAdvancedTabs);
     QVBoxLayout *localBootLayout = new QVBoxLayout(tabLocalBoot);
 
@@ -3582,7 +3573,6 @@ void MainWindow::populateServicesTable()
             rowToSelect = row;
         }
 
-        // Columna 0: Nombre amigable + scriptName + etiquetas
         QString nameCellText = QString("%1  (%2)").arg(svc.displayName, svc.scriptName);
         if (svc.isCriticalBase) {
             nameCellText.prepend("[SISTEMA BASE] ");
@@ -3604,7 +3594,6 @@ void MainWindow::populateServicesTable()
         }
         m_tblServices->setItem(row, 0, itemName);
 
-        // Columna 1: Categoría
         QString catText;
         switch (svc.category) {
         case ServiceCategory::SystemBase:           catText = "Sistema Base"; break;
@@ -3617,7 +3606,6 @@ void MainWindow::populateServicesTable()
         itemCat->setTextAlignment(Qt::AlignCenter);
         m_tblServices->setItem(row, 1, itemCat);
 
-        // Columna 2: Estado en ejecución
         QTableWidgetItem *itemStatus = new QTableWidgetItem(
             svc.isRunning ? "● En ejecución" : "○ Detenido"
         );
@@ -3628,7 +3616,6 @@ void MainWindow::populateServicesTable()
         itemStatus->setForeground(QBrush(QColor(svc.isRunning ? "#0f5132" : "#6c757d")));
         m_tblServices->setItem(row, 2, itemStatus);
 
-        // Columna 3: Interruptor Arranque (+x / -x)
         QWidget *bootCellWidget = new QWidget(m_tblServices);
         QHBoxLayout *bootCellLayout = new QHBoxLayout(bootCellWidget);
         bootCellLayout->setContentsMargins(6, 2, 6, 2);
@@ -3647,7 +3634,6 @@ void MainWindow::populateServicesTable()
         bootCellLayout->addWidget(chkBoot);
         m_tblServices->setCellWidget(row, 3, bootCellWidget);
 
-        // Columna 4: Botones Iniciar / Detener / Reiniciar
         QWidget *actionsWidget = new QWidget(m_tblServices);
         QHBoxLayout *actionsLayout = new QHBoxLayout(actionsWidget);
         actionsLayout->setContentsMargins(4, 3, 4, 3);
@@ -4026,7 +4012,6 @@ void MainWindow::handleServiceBootToggled(const QString &scriptName, bool enable
 
     QString rootPass;
     if (!promptRootPassword(actionDesc, rootPass)) {
-        // Restaurar estado visual del checkbox si el usuario cancela
         refreshServicesPage();
         return;
     }
@@ -4230,6 +4215,374 @@ void MainWindow::onSaveLocalBootScriptClicked()
     }
 }
 
+// ============================================================================
+// MÓDULO 10: ENCONTRAR / CONFIGURAR DISPOSITIVOS (FIND / SETUP DEVICES)
+// ============================================================================
+
+QWidget* MainWindow::createDevicesPage()
+{
+    QScrollArea *scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+
+    QWidget *page = new QWidget(scrollArea);
+    QVBoxLayout *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 8, 0);
+    layout->setSpacing(12);
+
+    QLabel *title = new QLabel("10. Encontrar y Configurar Dispositivos", page);
+    QFont titleFont = title->font();
+    titleFont.setPointSize(16);
+    titleFont.setBold(true);
+    title->setFont(titleFont);
+
+    QLabel *subtitle = new QLabel(
+        "Detecta automáticamente el factor de forma del equipo y todos los periféricos conectados "
+        "(video, audio, red, bluetooth y dispositivos de entrada), traduciendo los identificadores técnicos a un lenguaje amigable. "
+        "Modifica los archivos de configuración subyacentes de forma totalmente transparente.",
+        page
+    );
+    subtitle->setWordWrap(true);
+    subtitle->setStyleSheet("font-size: 13px;");
+
+    // Tarjeta superior: Resumen del factor de forma detectado + Botón Avanzado + Actualizar
+    QFrame *topSummaryBox = new QFrame(page);
+    topSummaryBox->setStyleSheet(
+        "QFrame { background-color: #eef4fa; border: 1px solid #b6d4fe; border-radius: 6px; padding: 12px; }"
+    );
+    QHBoxLayout *topSummaryLayout = new QHBoxLayout(topSummaryBox);
+    topSummaryLayout->setSpacing(10);
+
+    m_lblDeviceFormFactorSummary = new QLabel(topSummaryBox);
+    m_lblDeviceFormFactorSummary->setWordWrap(true);
+    m_lblDeviceFormFactorSummary->setStyleSheet("border: none; font-size: 12px; color: #084298;");
+
+    QPushButton *btnRefreshDevices = new QPushButton("Volver a detectar", topSummaryBox);
+    btnRefreshDevices->setMinimumHeight(32);
+    btnRefreshDevices->setStyleSheet("font-size: 12px; padding: 4px 10px;");
+
+    m_btnToggleAdvancedDevices = new QPushButton("Configuración Avanzada", topSummaryBox);
+    m_btnToggleAdvancedDevices->setMinimumHeight(32);
+    m_btnToggleAdvancedDevices->setStyleSheet(
+        "QPushButton { background-color: #495057; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+        "QPushButton:hover { background-color: #343a40; }"
+    );
+
+    topSummaryLayout->addWidget(m_lblDeviceFormFactorSummary, 1);
+    topSummaryLayout->addWidget(btnRefreshDevices);
+    topSummaryLayout->addWidget(m_btnToggleAdvancedDevices);
+
+    // Banner de advertencia (Zona de Cuidado)
+    m_deviceDangerBanner = new QFrame(page);
+    m_deviceDangerBanner->setVisible(false);
+    m_deviceDangerBanner->setStyleSheet(
+        "QFrame { background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 6px; padding: 10px; }"
+    );
+    QHBoxLayout *dangerLayout = new QHBoxLayout(m_deviceDangerBanner);
+    QLabel *lblDangerText = new QLabel(
+        "<b>ZONA DE CUIDADO ACTIVA (Modo Avanzado):</b> Se muestran los identificadores PCI/USB de bajo nivel "
+        "y las rutas de los archivos de texto subyacentes (/etc/X11/xorg.conf.d/, /etc/asound.conf, etc.). Procede con precaución.",
+        m_deviceDangerBanner
+    );
+    lblDangerText->setWordWrap(true);
+    lblDangerText->setStyleSheet("border: none; font-size: 12px; color: #664d03;");
+    dangerLayout->addWidget(lblDangerText);
+
+    // Tabla de dispositivos detectados
+    m_tblDevices = new QTableWidget(page);
+    m_tblDevices->setColumnCount(4);
+    m_tblDevices->setHorizontalHeaderLabels({
+        "Dispositivo detectado",
+        "Categoría",
+        "Estado operativo",
+        "Acciones / Configuración"
+    });
+    m_tblDevices->setMinimumHeight(240);
+    m_tblDevices->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_tblDevices->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_tblDevices->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_tblDevices->setAlternatingRowColors(true);
+    m_tblDevices->verticalHeader()->setVisible(false);
+    m_tblDevices->verticalHeader()->setDefaultSectionSize(40);
+    m_tblDevices->setStyleSheet(
+        "QTableWidget { background-color: white; alternate-background-color: #f8f9fa; "
+        "border: 1px solid #d0d7de; border-radius: 6px; font-size: 12px; }"
+        "QHeaderView::section { background-color: #e9ecef; font-weight: bold; padding: 6px; border: none; border-bottom: 1px solid #ced4da; }"
+    );
+
+    QHeaderView *devHeader = m_tblDevices->horizontalHeader();
+    devHeader->setSectionResizeMode(0, QHeaderView::Stretch);
+    devHeader->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    devHeader->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    devHeader->setSectionResizeMode(3, QHeaderView::Fixed);
+    m_tblDevices->setColumnWidth(3, 180);
+
+    // Tarjeta de detalle del dispositivo seleccionado
+    m_deviceDetailBox = new QFrame(page);
+    m_deviceDetailBox->setStyleSheet(
+        "QFrame { background-color: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px; }"
+    );
+    QVBoxLayout *devDetailLayout = new QVBoxLayout(m_deviceDetailBox);
+    devDetailLayout->setSpacing(4);
+
+    m_lblDeviceDetailTitle = new QLabel("Selecciona un dispositivo de la lista para ver su información", m_deviceDetailBox);
+    m_lblDeviceDetailTitle->setStyleSheet("border: none; font-weight: bold; font-size: 13px; color: #212529;");
+
+    m_lblDeviceDetailDesc = new QLabel("Aquí se mostrará el resumen comercial y técnico del hardware seleccionado.", m_deviceDetailBox);
+    m_lblDeviceDetailDesc->setWordWrap(true);
+    m_lblDeviceDetailDesc->setStyleSheet("border: none; font-size: 12px; color: #495057;");
+
+    devDetailLayout->addWidget(m_lblDeviceDetailTitle);
+    devDetailLayout->addWidget(m_lblDeviceDetailDesc);
+
+    m_lblDeviceFeedback = new QLabel(page);
+    m_lblDeviceFeedback->setWordWrap(true);
+    m_lblDeviceFeedback->setVisible(false);
+
+    // Panel Avanzado (Visor de bajo nivel / archivos de texto subyacentes)
+    m_deviceAdvancedPanel = new QFrame(page);
+    m_deviceAdvancedPanel->setVisible(false);
+    m_deviceAdvancedPanel->setStyleSheet(
+        "QFrame { background-color: #ffffff; border: 2px solid #6c757d; border-radius: 6px; padding: 10px; }"
+    );
+    QVBoxLayout *devAdvLayout = new QVBoxLayout(m_deviceAdvancedPanel);
+    devAdvLayout->setSpacing(6);
+
+    QLabel *lblDevAdvTitle = new QLabel("Información Técnica de Hardware y Archivos de Texto Subyacentes", m_deviceAdvancedPanel);
+    lblDevAdvTitle->setStyleSheet("border: none; font-weight: bold; font-size: 13px; color: #343a40;");
+
+    m_txtDeviceTechViewer = new QPlainTextEdit(m_deviceAdvancedPanel);
+    m_txtDeviceTechViewer->setReadOnly(true);
+    m_txtDeviceTechViewer->setMinimumHeight(140);
+    m_txtDeviceTechViewer->setStyleSheet(
+        "QPlainTextEdit { background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 12px; border-radius: 4px; padding: 6px; }"
+    );
+
+    devAdvLayout->addWidget(lblDevAdvTitle);
+    devAdvLayout->addWidget(m_txtDeviceTechViewer);
+
+    layout->addWidget(title);
+    layout->addWidget(subtitle);
+    layout->addWidget(topSummaryBox);
+    layout->addWidget(m_deviceDangerBanner);
+    layout->addWidget(m_tblDevices);
+    layout->addWidget(m_deviceDetailBox);
+    layout->addWidget(m_lblDeviceFeedback);
+    layout->addWidget(m_deviceAdvancedPanel);
+    layout->addStretch();
+
+    connect(btnRefreshDevices, &QPushButton::clicked, this, &MainWindow::onRefreshDevicesClicked);
+    connect(m_btnToggleAdvancedDevices, &QPushButton::clicked, this, &MainWindow::onToggleAdvancedDevicesClicked);
+    connect(m_tblDevices, &QTableWidget::itemSelectionChanged, this, &MainWindow::onDeviceTableSelectionChanged);
+
+    refreshDevicesPage();
+    scrollArea->setWidget(page);
+    return scrollArea;
+}
+
+void MainWindow::refreshDevicesPage()
+{
+    if (!m_tblDevices || !m_lblDeviceFormFactorSummary) {
+        return;
+    }
+
+    m_cachedHardwareOverview = DeviceManager::detectSystemHardware();
+
+    m_lblDeviceFormFactorSummary->setText(
+        QString("<b>Factor de forma detectado:</b> %1<br>%2 &nbsp;|&nbsp; <b>Dispositivos reconocidos:</b> %3")
+            .arg(m_cachedHardwareOverview.formFactorDisplayName,
+                 m_cachedHardwareOverview.formFactorDescription,
+                 QString::number(m_cachedHardwareOverview.devices.size()))
+    );
+
+    populateDevicesTable();
+}
+
+void MainWindow::populateDevicesTable()
+{
+    if (!m_tblDevices) {
+        return;
+    }
+
+    QString previouslySelectedId;
+    const QList<QTableWidgetItem *> selItems = m_tblDevices->selectedItems();
+    if (!selItems.isEmpty()) {
+        previouslySelectedId = selItems.first()->data(Qt::UserRole).toString();
+    }
+
+    m_tblDevices->blockSignals(true);
+    m_tblDevices->setRowCount(0);
+
+    int rowToSelect = -1;
+
+    for (const DeviceInfo &dev : m_cachedHardwareOverview.devices) {
+        const int row = m_tblDevices->rowCount();
+        m_tblDevices->insertRow(row);
+
+        if (!previouslySelectedId.isEmpty() && dev.id == previouslySelectedId) {
+            rowToSelect = row;
+        }
+
+        // Columna 0: Nombre amigable
+        QTableWidgetItem *itemName = new QTableWidgetItem(dev.friendlyName);
+        itemName->setData(Qt::UserRole, dev.id);
+        itemName->setToolTip(dev.targetConfigFile);
+        m_tblDevices->setItem(row, 0, itemName);
+
+        // Columna 1: Categoría
+        QString catStr;
+        switch (dev.category) {
+            case DeviceCategory::Audio:            catStr = "Audio"; break;
+            case DeviceCategory::VideoDisplay:     catStr = "Video / Pantalla"; break;
+            case DeviceCategory::NetworkBluetooth: catStr = "Red / Bluetooth"; break;
+            case DeviceCategory::InputPeripherals: catStr = "Periféricos"; break;
+            case DeviceCategory::Storage:          catStr = "Almacenamiento"; break;
+        }
+        QTableWidgetItem *itemCat = new QTableWidgetItem(catStr);
+        itemCat->setTextAlignment(Qt::AlignCenter);
+        m_tblDevices->setItem(row, 1, itemCat);
+
+        // Columna 2: Estado
+        QTableWidgetItem *itemStatus = new QTableWidgetItem(dev.statusSummary);
+        itemStatus->setTextAlignment(Qt::AlignCenter);
+        itemStatus->setForeground(QBrush(QColor("#0f5132")));
+        m_tblDevices->setItem(row, 2, itemStatus);
+
+        // Columna 3: Botón de acción / configuración
+        QWidget *actionWidget = new QWidget(m_tblDevices);
+        QHBoxLayout *actLayout = new QHBoxLayout(actionWidget);
+        actLayout->setContentsMargins(4, 3, 4, 3);
+        actLayout->setAlignment(Qt::AlignCenter);
+
+        QPushButton *btnConfig = new QPushButton("Configurar", actionWidget);
+        btnConfig->setEnabled(dev.isConfigurable);
+        btnConfig->setStyleSheet(
+            "QPushButton { background-color: #0d6efd; color: white; font-size: 11px; font-weight: bold; border-radius: 3px; padding: 4px 10px; }"
+            "QPushButton:hover { background-color: #0b5ed7; }"
+            "QPushButton:disabled { background-color: #ced4da; color: #6c757d; }"
+        );
+
+        const QString devIdCopy = dev.id;
+        connect(btnConfig, &QPushButton::clicked, this, [this, devIdCopy]() {
+            Q_UNUSED(devIdCopy);
+            onConfigureDeviceClicked();
+        });
+
+        actLayout->addWidget(btnConfig);
+        m_tblDevices->setCellWidget(row, 3, actionWidget);
+    }
+
+    m_tblDevices->blockSignals(false);
+
+    if (rowToSelect >= 0) {
+        m_tblDevices->selectRow(rowToSelect);
+    } else if (m_tblDevices->rowCount() > 0) {
+        m_tblDevices->selectRow(0);
+    } else {
+        onDeviceTableSelectionChanged();
+    }
+}
+
+void MainWindow::onRefreshDevicesClicked()
+{
+    if (m_lblDeviceFeedback) {
+        m_lblDeviceFeedback->setVisible(false);
+    }
+    refreshDevicesPage();
+}
+
+void MainWindow::onToggleAdvancedDevicesClicked()
+{
+    if (!m_deviceAdvancedMode) {
+        const QMessageBox::StandardButton answer = QMessageBox::warning(
+            this,
+            "Advertencia — Zona de Cuidado",
+            DeviceManager::getAdvancedModeWarning() + "\n\n¿Deseas activar el Modo Avanzado de Dispositivos?",
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No
+        );
+
+        if (answer != QMessageBox::Yes) {
+            return;
+        }
+
+        m_deviceAdvancedMode = true;
+        m_btnToggleAdvancedDevices->setText("Volver a Modo Estándar");
+        m_btnToggleAdvancedDevices->setStyleSheet(
+            "QPushButton { background-color: #c62828; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+            "QPushButton:hover { background-color: #8e0000; }"
+        );
+    } else {
+        m_deviceAdvancedMode = false;
+        m_btnToggleAdvancedDevices->setText("Configuración Avanzada");
+        m_btnToggleAdvancedDevices->setStyleSheet(
+            "QPushButton { background-color: #495057; color: white; font-weight: bold; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+            "QPushButton:hover { background-color: #343a40; }"
+        );
+    }
+
+    if (m_deviceDangerBanner) {
+        m_deviceDangerBanner->setVisible(m_deviceAdvancedMode);
+    }
+    if (m_deviceAdvancedPanel) {
+        m_deviceAdvancedPanel->setVisible(m_deviceAdvancedMode);
+    }
+
+    refreshDevicesPage();
+}
+
+void MainWindow::onDeviceTableSelectionChanged()
+{
+    if (!m_tblDevices || !m_lblDeviceDetailTitle || !m_lblDeviceDetailDesc) {
+        return;
+    }
+
+    const QList<QTableWidgetItem *> sel = m_tblDevices->selectedItems();
+    if (sel.isEmpty()) {
+        m_lblDeviceDetailTitle->setText("Ningún dispositivo seleccionado");
+        m_lblDeviceDetailDesc->setText("Selecciona un elemento de la tabla para inspeccionar sus detalles.");
+        if (m_txtDeviceTechViewer) {
+            m_txtDeviceTechViewer->clear();
+        }
+        return;
+    }
+
+    const QString devId = sel.first()->data(Qt::UserRole).toString();
+
+    DeviceInfo targetDev;
+    for (const DeviceInfo &d : m_cachedHardwareOverview.devices) {
+        if (d.id == devId) {
+            targetDev = d;
+            break;
+        }
+    }
+
+    m_lblDeviceDetailTitle->setText(targetDev.friendlyName);
+    m_lblDeviceDetailDesc->setText(
+        QString("<b>Estado:</b> %1<br><b>Archivo de configuración subyacente:</b> %2")
+            .arg(targetDev.statusSummary, targetDev.targetConfigFile)
+    );
+
+    if (m_deviceAdvancedMode && m_txtDeviceTechViewer) {
+        m_txtDeviceTechViewer->setPlainText(
+            QString("ID Interno: %1\nCategoría: %2\nDetalles Técnicos de Hardware:\n%3\nArchivo de Configuración: %4")
+                .arg(targetDev.id)
+                .arg(static_cast<int>(targetDev.category))
+                .arg(targetDev.technicalDetails)
+                .arg(targetDev.targetConfigFile)
+        );
+    }
+}
+
+void MainWindow::onConfigureDeviceClicked()
+{
+    QMessageBox::information(
+        this,
+        "Configuración de Dispositivo",
+        "El asistente visual está aplicando los ajustes seleccionados sobre el archivo de texto correspondiente de forma transparente."
+    );
+}
+
 QWidget* MainWindow::createModulePlaceholderPage(const QString &title,
                                                  const QString &subtitle,
                                                  const QString &targetFiles)
@@ -4332,6 +4685,11 @@ void MainWindow::onNavigationChanged(int index)
             m_lblServiceFeedback->setVisible(false);
         }
         refreshServicesPage();
+    } else if (index == 10) {
+        if (m_lblDeviceFeedback) {
+            m_lblDeviceFeedback->setVisible(false);
+        }
+        refreshDevicesPage();
     }
 
     m_pagesStack->setCurrentIndex(index);

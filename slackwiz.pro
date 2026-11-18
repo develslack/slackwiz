@@ -39,6 +39,7 @@ SOURCES += \
     src/modules/databaseManager.cpp \
     src/modules/timeManager.cpp \
     src/modules/ServiceManager.cpp \
+    src/modules/DeviceManager.cpp \
     src/ui/timezoneMapWidget.cpp \
     src/ui/timeConfigWidget.cpp \
     src/ui/mainWindow.cpp
@@ -56,6 +57,7 @@ HEADERS += \
     src/modules/databaseManager.h \
     src/modules/timeManager.h \
     src/modules/ServiceManager.h \
+    src/modules/DeviceManager.h \
     src/ui/timezoneMapWidget.h \
     src/ui/timeConfigWidget.h \
     src/ui/mainWindow.h

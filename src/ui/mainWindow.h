@@ -28,6 +28,7 @@
 #include "timeManager.h"
 #include "timezoneMapWidget.h"
 #include "ServiceManager.h"
+#include "DeviceManager.h"
 
 class MainWindow : public QMainWindow
 {
@@ -109,6 +110,12 @@ private slots:
     void onSaveLocalBootScriptClicked();
     void onConfigureSambaClicked();
 
+    // Módulo 10: Encontrar / Configurar Dispositivos
+    void onRefreshDevicesClicked();
+    void onToggleAdvancedDevicesClicked();
+    void onDeviceTableSelectionChanged();
+    void onConfigureDeviceClicked();
+
 private:
     void setupUi();
     void setupNavigationMenu();
@@ -126,6 +133,9 @@ private:
     void refreshTimePage();
     void refreshServicesPage();
     void populateServicesTable();
+    void refreshDevicesPage();
+    void populateDevicesTable();
+
     void handleServiceBootToggled(const QString &scriptName, bool enable);
     void handleServiceActionClicked(const QString &scriptName, ServiceAction action);
     void handleApplyServicePreset(ServicePreset preset, const QString &presetLabel);
@@ -141,6 +151,7 @@ private:
     QWidget* createDatabasePage();
     QWidget* createTimePage();
     QWidget* createServicesPage();
+    QWidget* createDevicesPage();
     QWidget* createModulePlaceholderPage(const QString &title,
                                          const QString &subtitle,
                                          const QString &targetFiles);
@@ -311,6 +322,20 @@ private:
     QPushButton *m_btnSaveLocalBootScript;
     QList<SystemServiceInfo> m_cachedServices;
     bool m_serviceAdvancedMode = false;
+
+    // Controles del Módulo 10: Dispositivos
+    QLabel *m_lblDeviceFormFactorSummary;
+    QPushButton *m_btnToggleAdvancedDevices;
+    QFrame *m_deviceDangerBanner;
+    QTableWidget *m_tblDevices;
+    QFrame *m_deviceDetailBox;
+    QLabel *m_lblDeviceDetailTitle;
+    QLabel *m_lblDeviceDetailDesc;
+    QLabel *m_lblDeviceFeedback;
+    QFrame *m_deviceAdvancedPanel;
+    QPlainTextEdit *m_txtDeviceTechViewer;
+    SystemHardwareOverview m_cachedHardwareOverview;
+    bool m_deviceAdvancedMode = false;
 };
 
 #endif // MAINWINDOW_H
