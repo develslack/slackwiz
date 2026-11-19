@@ -14,6 +14,17 @@ enum class DeviceCategory {
     Storage
 };
 
+enum class DeviceKind {
+    VideoDisplay,
+    Audio,
+    Network,
+    Bluetooth,
+    Mouse,
+    Touchpad,
+    Keyboard,
+    Storage
+};
+
 enum class FormFactor {
     Notebook,
     Workstation,
@@ -22,13 +33,15 @@ enum class FormFactor {
 };
 
 struct DeviceInfo {
-    QString id;                 // Identificador único (ej. "audio_primary", "video_nvidia")
-    QString friendlyName;       // Nombre comercial limpio para novatos (ej. "Placa de Audio Realtek ALC892")
-    QString technicalDetails;   // Detalles técnicos para modo avanzado (ej. "PCI: 8086:a348, Driver: snd_hda_intel")
-    DeviceCategory category;
+    QString id;                 // Identificador único (ej. "mouse_input", "video_controller_0")
+    DeviceKind kind = DeviceKind::Mouse;
+    QString friendlyName;       // Nombre comercial limpio para novatos
+    QString technicalDetails;   // Detalles técnicos para modo avanzado
+    DeviceCategory category = DeviceCategory::InputPeripherals;
     bool isConfigurable = true;
-    QString statusSummary;      // Estado actual (ej. "Activo y listo", "Conectado")
-    QString targetConfigFile;   // Archivo de texto subyacente que modifica (ej. "/etc/asound.conf")
+    QString statusSummary;      // Estado actual legible
+    QString targetConfigFile;   // Archivo de texto subyacente que modifica
+    QVariantMap currentSettings;// Valores actuales leídos del sistema para precargar el diálogo
 };
 
 struct SystemHardwareOverview {
@@ -48,7 +61,10 @@ class DeviceManager
 {
 public:
     static SystemHardwareOverview detectSystemHardware();
-    static DeviceOperationResult applyDeviceConfiguration(const QString &deviceId, const QVariantMap &settings, const QString &rootPassword);
+    static DeviceOperationResult applyDeviceConfiguration(const QString &deviceId,
+                                                            const QVariantMap &settings,
+                                                            const QString &rootPassword = QString());
+    static QString previewConfigContent(const QString &deviceId, const QVariantMap &settings);
     static QString getAdvancedModeWarning();
 };
 

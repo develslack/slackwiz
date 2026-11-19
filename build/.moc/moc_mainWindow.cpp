@@ -22,8 +22,8 @@ QT_BEGIN_MOC_NAMESPACE
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 struct qt_meta_stringdata_MainWindow_t {
-    QByteArrayData data[64];
-    char stringdata0[1462];
+    QByteArrayData data[65];
+    char stringdata0[1471];
 };
 #define QT_MOC_LITERAL(idx, ofs, len) \
     Q_STATIC_BYTE_ARRAY_DATA_HEADER_INITIALIZER_WITH_OFFSET(len, \
@@ -95,7 +95,8 @@ QT_MOC_LITERAL(59, 1328, 23), // "onConfigureSambaClicked"
 QT_MOC_LITERAL(60, 1352, 23), // "onRefreshDevicesClicked"
 QT_MOC_LITERAL(61, 1376, 30), // "onToggleAdvancedDevicesClicked"
 QT_MOC_LITERAL(62, 1407, 29), // "onDeviceTableSelectionChanged"
-QT_MOC_LITERAL(63, 1437, 24) // "onConfigureDeviceClicked"
+QT_MOC_LITERAL(63, 1437, 24), // "onConfigureDeviceClicked"
+QT_MOC_LITERAL(64, 1462, 8) // "deviceId"
 
     },
     "MainWindow\0onNavigationChanged\0\0index\0"
@@ -142,7 +143,7 @@ QT_MOC_LITERAL(63, 1437, 24) // "onConfigureDeviceClicked"
     "onConfigureSambaClicked\0onRefreshDevicesClicked\0"
     "onToggleAdvancedDevicesClicked\0"
     "onDeviceTableSelectionChanged\0"
-    "onConfigureDeviceClicked"
+    "onConfigureDeviceClicked\0deviceId"
 };
 #undef QT_MOC_LITERAL
 
@@ -215,7 +216,7 @@ static const uint qt_meta_data_MainWindow[] = {
       60,    0,  374,    2, 0x08 /* Private */,
       61,    0,  375,    2, 0x08 /* Private */,
       62,    0,  376,    2, 0x08 /* Private */,
-      63,    0,  377,    2, 0x08 /* Private */,
+      63,    1,  377,    2, 0x08 /* Private */,
 
  // slots: parameters
     QMetaType::Void, QMetaType::Int,    3,
@@ -273,7 +274,7 @@ static const uint qt_meta_data_MainWindow[] = {
     QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
-    QMetaType::Void,
+    QMetaType::Void, QMetaType::QString,   64,
 
        0        // eod
 };
@@ -339,7 +340,7 @@ void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 52: _t->onRefreshDevicesClicked(); break;
         case 53: _t->onToggleAdvancedDevicesClicked(); break;
         case 54: _t->onDeviceTableSelectionChanged(); break;
-        case 55: _t->onConfigureDeviceClicked(); break;
+        case 55: _t->onConfigureDeviceClicked((*reinterpret_cast< const QString(*)>(_a[1]))); break;
         default: ;
         }
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {

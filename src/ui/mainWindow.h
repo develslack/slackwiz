@@ -114,7 +114,7 @@ private slots:
     void onRefreshDevicesClicked();
     void onToggleAdvancedDevicesClicked();
     void onDeviceTableSelectionChanged();
-    void onConfigureDeviceClicked();
+    void onConfigureDeviceClicked(const QString &deviceId);
 
 private:
     void setupUi();
@@ -135,6 +135,17 @@ private:
     void populateServicesTable();
     void refreshDevicesPage();
     void populateDevicesTable();
+
+    // Diálogos visuales específicos por dispositivo (Módulo 10)
+    void openMouseConfigDialog(const DeviceInfo &dev);
+    void openTouchpadConfigDialog(const DeviceInfo &dev);
+    void openKeyboardDeviceConfigDialog(const DeviceInfo &dev);
+    void openVideoConfigDialog(const DeviceInfo &dev);
+    void openAudioConfigDialog(const DeviceInfo &dev);
+    void openBluetoothConfigDialog(const DeviceInfo &dev);
+    void openNetworkConfigDialog(const DeviceInfo &dev);
+    void openStorageConfigDialog(const DeviceInfo &dev);
+    void commitDeviceSettings(const DeviceInfo &dev, const QVariantMap &settings);
 
     void handleServiceBootToggled(const QString &scriptName, bool enable);
     void handleServiceActionClicked(const QString &scriptName, ServiceAction action);

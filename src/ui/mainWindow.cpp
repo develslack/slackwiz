@@ -36,6 +36,9 @@
 #include <QBrush>
 #include <QColor>
 #include <QFileInfo>
+#include <QGroupBox>
+#include <QSlider>
+#include <QSpinBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -4464,8 +4467,7 @@ void MainWindow::populateDevicesTable()
 
         const QString devIdCopy = dev.id;
         connect(btnConfig, &QPushButton::clicked, this, [this, devIdCopy]() {
-            Q_UNUSED(devIdCopy);
-            onConfigureDeviceClicked();
+            onConfigureDeviceClicked(devIdCopy);
         });
 
         actLayout->addWidget(btnConfig);
@@ -4574,13 +4576,919 @@ void MainWindow::onDeviceTableSelectionChanged()
     }
 }
 
-void MainWindow::onConfigureDeviceClicked()
+void MainWindow::onConfigureDeviceClicked(const QString &deviceId)
 {
-    QMessageBox::information(
-        this,
-        "Configuración de Dispositivo",
-        "El asistente visual está aplicando los ajustes seleccionados sobre el archivo de texto correspondiente de forma transparente."
+    DeviceInfo targetDev;
+    bool found = false;
+
+    for (const DeviceInfo &d : m_cachedHardwareOverview.devices) {
+        if (d.id == deviceId) {
+            targetDev = d;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        return;
+    }
+
+    switch (targetDev.kind) {
+        case DeviceKind::Mouse:
+            openMouseConfigDialog(targetDev);
+            break;
+        case DeviceKind::Touchpad:
+            openTouchpadConfigDialog(targetDev);
+            break;
+        case DeviceKind::Keyboard:
+            openKeyboardDeviceConfigDialog(targetDev);
+            break;
+        case DeviceKind::VideoDisplay:
+            openVideoConfigDialog(targetDev);
+            break;
+        case DeviceKind::Audio:
+            openAudioConfigDialog(targetDev);
+            break;
+        case DeviceKind::Bluetooth:
+            openBluetoothConfigDialog(targetDev);
+            break;
+        case DeviceKind::Network:
+            openNetworkConfigDialog(targetDev);
+            break;
+        case DeviceKind::Storage:
+            openStorageConfigDialog(targetDev);
+            break;
+    }
+}
+
+void MainWindow::commitDeviceSettings(const DeviceInfo &dev, const QVariantMap &settings)
+{
+    QString rootPass;
+    if (!CommandRunner::isRoot()) {
+        if (!promptRootPassword(
+                QString("Guardar configuración de <b>%1</b> (%2)")
+                    .arg(dev.friendlyName, dev.targetConfigFile),
+                rootPass)) {
+            return;
+        }
+    }
+
+    const DeviceOperationResult res = DeviceManager::applyDeviceConfiguration(dev.id, settings, rootPass);
+    rootPass.fill(QChar('\0'));
+    rootPass.clear();
+
+    if (m_lblDeviceFeedback) {
+        m_lblDeviceFeedback->setVisible(true);
+        if (res.success) {
+            m_lblDeviceFeedback->setStyleSheet(
+                "QLabel { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblDeviceFeedback->setText(res.message);
+        } else {
+            m_lblDeviceFeedback->setStyleSheet(
+                "QLabel { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; "
+                "border-radius: 6px; padding: 10px; font-size: 13px; font-weight: bold; }"
+            );
+            m_lblDeviceFeedback->setText(res.message);
+        }
+    }
+
+    refreshDevicesPage();
+}
+
+void MainWindow::openMouseConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Ratón — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(520);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    QLabel *lblInfo = new QLabel(
+        QString("<b>%1</b><br>Ajusta el comportamiento del puntero y los botones de forma visual.")
+            .arg(dev.friendlyName),
+        &dlg
     );
+    lblInfo->setWordWrap(true);
+    lblInfo->setStyleSheet(
+        "background-color: #eef4fa; color: #084298; border: 1px solid #b6d4fe; border-radius: 6px; padding: 10px; font-size: 12px;"
+    );
+    mainLayout->addWidget(lblInfo);
+
+    // Opciones para Usuario Novel
+    QGroupBox *boxBasic = new QGroupBox("Ajustes del Ratón", &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(10);
+
+    // Orientación de mano
+    QWidget *handWidget = new QWidget(boxBasic);
+    QHBoxLayout *handLayout = new QHBoxLayout(handWidget);
+    handLayout->setContentsMargins(0, 0, 0, 0);
+    QRadioButton *radioRight = new QRadioButton("Mano derecha (Estándar)", handWidget);
+    QRadioButton *radioLeft = new QRadioButton("Mano izquierda (Zurdo)", handWidget);
+    const bool isLeft = dev.currentSettings.value("leftHanded", false).toBool();
+    radioLeft->setChecked(isLeft);
+    radioRight->setChecked(!isLeft);
+    handLayout->addWidget(radioRight);
+    handLayout->addWidget(radioLeft);
+    basicForm->addRow("Botón principal:", handWidget);
+
+    // Velocidad / movimiento suave o rápido (-0.85 a +0.85)
+    QWidget *speedWidget = new QWidget(boxBasic);
+    QVBoxLayout *speedVBox = new QVBoxLayout(speedWidget);
+    speedVBox->setContentsMargins(0, 0, 0, 0);
+    QSlider *sliderSpeed = new QSlider(Qt::Horizontal, speedWidget);
+    sliderSpeed->setRange(-85, 85);
+    sliderSpeed->setTickInterval(20);
+    sliderSpeed->setTickPosition(QSlider::TicksBelow);
+    sliderSpeed->setValue(qRound(dev.currentSettings.value("accelSpeed", 0.0).toDouble() * 100.0));
+
+    QHBoxLayout *speedLabels = new QHBoxLayout();
+    QLabel *lblSlow = new QLabel("Suave / Preciso", speedWidget);
+    QLabel *lblSpeedVal = new QLabel(speedWidget);
+    lblSpeedVal->setAlignment(Qt::AlignCenter);
+    lblSpeedVal->setStyleSheet("font-weight: bold; color: #084298;");
+    QLabel *lblFast = new QLabel("Rápido", speedWidget);
+    lblFast->setAlignment(Qt::AlignRight);
+    speedLabels->addWidget(lblSlow);
+    speedLabels->addWidget(lblSpeedVal, 1);
+    speedLabels->addWidget(lblFast);
+    speedVBox->addWidget(sliderSpeed);
+    speedVBox->addLayout(speedLabels);
+    basicForm->addRow("Velocidad del cursor:", speedWidget);
+
+    auto updateSpeedLabel = [lblSpeedVal](int val) {
+        QString desc = "Estándar";
+        if (val < -20) desc = "Suave";
+        else if (val > 20) desc = "Rápido";
+        lblSpeedVal->setText(QString("%1 (%2)").arg(desc, QString::number(val / 100.0, 'f', 2)));
+    };
+    updateSpeedLabel(sliderSpeed->value());
+    connect(sliderSpeed, &QSlider::valueChanged, &dlg, updateSpeedLabel);
+
+    QCheckBox *chkNatural = new QCheckBox("Desplazamiento natural con la rueda (invertido)", boxBasic);
+    chkNatural->setChecked(dev.currentSettings.value("naturalScrolling", false).toBool());
+    basicForm->addRow("", chkNatural);
+
+    QCheckBox *chkApplyLive = new QCheckBox("Aplicar al instante en la sesión actual (xinput)", boxBasic);
+    chkApplyLive->setChecked(dev.currentSettings.value("applyLiveX11", true).toBool());
+    basicForm->addRow("", chkApplyLive);
+
+    mainLayout->addWidget(boxBasic);
+
+    // Opciones Avanzadas (solo visibles si m_deviceAdvancedMode está activo)
+    QGroupBox *boxAdv = new QGroupBox("Opciones Avanzadas (libinput / Xorg)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+    QFormLayout *advForm = new QFormLayout();
+
+    QComboBox *comboProfile = new QComboBox(boxAdv);
+    comboProfile->addItem("Adaptativo (aceleración dinámica recomendada)", "adaptive");
+    comboProfile->addItem("Plano / Flat (sin aceleración, 1:1 directo)", "flat");
+    const int profIdx = comboProfile->findData(dev.currentSettings.value("accelProfile", "adaptive").toString());
+    if (profIdx >= 0) comboProfile->setCurrentIndex(profIdx);
+    advForm->addRow("Perfil de aceleración:", comboProfile);
+
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(120);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+
+    advLayout->addLayout(advForm);
+    advLayout->addWidget(new QLabel(QString("Vista previa de %1:").arg(dev.targetConfigFile), boxAdv));
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["leftHanded"] = radioLeft->isChecked();
+        s["accelSpeed"] = sliderSpeed->value() / 100.0;
+        s["accelProfile"] = comboProfile->currentData().toString();
+        s["naturalScrolling"] = chkNatural->isChecked();
+        s["applyLiveX11"] = chkApplyLive->isChecked();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+    refreshPreview();
+    connect(radioLeft, &QRadioButton::toggled, &dlg, refreshPreview);
+    connect(sliderSpeed, &QSlider::valueChanged, &dlg, refreshPreview);
+    connect(chkNatural, &QCheckBox::toggled, &dlg, refreshPreview);
+    connect(comboProfile, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    mainLayout->addWidget(btnBox);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
+}
+
+void MainWindow::openTouchpadConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Panel Táctil — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(520);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    QGroupBox *boxBasic = new QGroupBox("Ajustes del Panel Táctil (Touchpad)", &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(8);
+
+    QCheckBox *chkTapping = new QCheckBox("Toque para hacer clic (Tap-to-click)", boxBasic);
+    chkTapping->setChecked(dev.currentSettings.value("tapping", true).toBool());
+    basicForm->addRow("", chkTapping);
+
+    QComboBox *comboScroll = new QComboBox(boxBasic);
+    comboScroll->addItem("Desplazamiento con dos dedos", "twofinger");
+    comboScroll->addItem("Desplazamiento por el borde derecho", "edge");
+    const int scIdx = comboScroll->findData(dev.currentSettings.value("scrollMethod", "twofinger").toString());
+    if (scIdx >= 0) comboScroll->setCurrentIndex(scIdx);
+    basicForm->addRow("Método de desplazamiento:", comboScroll);
+
+    QCheckBox *chkNatural = new QCheckBox("Desplazamiento natural (estilo smartphone)", boxBasic);
+    chkNatural->setChecked(dev.currentSettings.value("naturalScrolling", true).toBool());
+    basicForm->addRow("", chkNatural);
+
+    QCheckBox *chkDwt = new QCheckBox("Desactivar panel táctil mientras se escribe", boxBasic);
+    chkDwt->setChecked(dev.currentSettings.value("disableWhileTyping", true).toBool());
+    basicForm->addRow("", chkDwt);
+
+    QSlider *sliderSpeed = new QSlider(Qt::Horizontal, boxBasic);
+    sliderSpeed->setRange(-85, 85);
+    sliderSpeed->setValue(qRound(dev.currentSettings.value("accelSpeed", 0.15).toDouble() * 100.0));
+    basicForm->addRow("Velocidad del puntero:", sliderSpeed);
+
+    QCheckBox *chkApplyLive = new QCheckBox("Aplicar al instante en la sesión actual (xinput)", boxBasic);
+    chkApplyLive->setChecked(dev.currentSettings.value("applyLiveX11", true).toBool());
+    basicForm->addRow("", chkApplyLive);
+
+    mainLayout->addWidget(boxBasic);
+
+    QGroupBox *boxAdv = new QGroupBox("Vista previa Avanzada (Xorg libinput)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(120);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["tapping"] = chkTapping->isChecked();
+        s["scrollMethod"] = comboScroll->currentData().toString();
+        s["naturalScrolling"] = chkNatural->isChecked();
+        s["disableWhileTyping"] = chkDwt->isChecked();
+        s["accelSpeed"] = sliderSpeed->value() / 100.0;
+        s["applyLiveX11"] = chkApplyLive->isChecked();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+    refreshPreview();
+    connect(chkTapping, &QCheckBox::toggled, &dlg, refreshPreview);
+    connect(comboScroll, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+    connect(chkNatural, &QCheckBox::toggled, &dlg, refreshPreview);
+    connect(chkDwt, &QCheckBox::toggled, &dlg, refreshPreview);
+    connect(sliderSpeed, &QSlider::valueChanged, &dlg, refreshPreview);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    mainLayout->addWidget(btnBox);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
+}
+
+void MainWindow::openKeyboardDeviceConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Teclado — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(500);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    QGroupBox *boxBasic = new QGroupBox("Ajustes de Repetición y Teclas", &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(10);
+
+    QSpinBox *spinDelay = new QSpinBox(boxBasic);
+    spinDelay->setRange(150, 900);
+    spinDelay->setSingleStep(50);
+    spinDelay->setSuffix(" ms");
+    spinDelay->setValue(dev.currentSettings.value("repeatDelay", 350).toInt());
+    basicForm->addRow("Retardo antes de repetir:", spinDelay);
+
+    QSpinBox *spinRate = new QSpinBox(boxBasic);
+    spinRate->setRange(10, 80);
+    spinRate->setSuffix(" teclas/seg");
+    spinRate->setValue(dev.currentSettings.value("repeatRate", 30).toInt());
+    basicForm->addRow("Velocidad de repetición:", spinRate);
+
+    QCheckBox *chkNumLock = new QCheckBox("Activar Bloq Num (NumLock)", boxBasic);
+    chkNumLock->setChecked(dev.currentSettings.value("numLockOn", true).toBool());
+    basicForm->addRow("", chkNumLock);
+
+    QCheckBox *chkApplyLive = new QCheckBox("Aplicar al instante en X11 (xset)", boxBasic);
+    chkApplyLive->setChecked(dev.currentSettings.value("applyLiveX11", true).toBool());
+    basicForm->addRow("", chkApplyLive);
+
+    mainLayout->addWidget(boxBasic);
+
+    QGroupBox *boxAdv = new QGroupBox("Vista previa Avanzada (Xorg)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(110);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["repeatDelay"] = spinDelay->value();
+        s["repeatRate"] = spinRate->value();
+        s["numLockOn"] = chkNumLock->isChecked();
+        s["applyLiveX11"] = chkApplyLive->isChecked();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+    refreshPreview();
+    connect(spinDelay, QOverload<int>::of(&QSpinBox::valueChanged), &dlg, refreshPreview);
+    connect(spinRate, QOverload<int>::of(&QSpinBox::valueChanged), &dlg, refreshPreview);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    mainLayout->addWidget(btnBox);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
+}
+
+void MainWindow::openVideoConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Video y Pantalla — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(520);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    QGroupBox *boxBasic = new QGroupBox("Ajustes de Pantalla", &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(8);
+
+    QComboBox *comboOutput = new QComboBox(boxBasic);
+    const QStringList outputs = dev.currentSettings.value("availableOutputs").toStringList();
+    comboOutput->addItems(outputs.isEmpty() ? QStringList{"Automática"} : outputs);
+    comboOutput->setCurrentText(dev.currentSettings.value("outputName", "Automática").toString());
+    basicForm->addRow("Salida de video:", comboOutput);
+
+    QComboBox *comboRes = new QComboBox(boxBasic);
+    const QStringList resolutions = dev.currentSettings.value("availableResolutions").toStringList();
+    comboRes->addItems(resolutions.isEmpty() ? QStringList{"Automática (Nativa)", "1920x1080", "1366x768"} : resolutions);
+    comboRes->setCurrentText(dev.currentSettings.value("resolution", "Automática (Nativa)").toString());
+    basicForm->addRow("Resolución:", comboRes);
+
+    QComboBox *comboHz = new QComboBox(boxBasic);
+    comboHz->addItems({ "Automática", "60 Hz", "75 Hz", "120 Hz", "144 Hz" });
+    comboHz->setCurrentText(dev.currentSettings.value("refreshRate", "Automática").toString());
+    basicForm->addRow("Frecuencia (Hz):", comboHz);
+
+    QComboBox *comboRot = new QComboBox(boxBasic);
+    comboRot->addItem("Normal (Horizontal)", "normal");
+    comboRot->addItem("Girada a la izquierda (90°)", "left");
+    comboRot->addItem("Girada a la derecha (270°)", "right");
+    comboRot->addItem("Invertida (180°)", "inverted");
+    const int rotIdx = comboRot->findData(dev.currentSettings.value("rotation", "normal").toString());
+    if (rotIdx >= 0) comboRot->setCurrentIndex(rotIdx);
+    basicForm->addRow("Orientación:", comboRot);
+
+    QSlider *sliderBright = new QSlider(Qt::Horizontal, boxBasic);
+    sliderBright->setRange(40, 100);
+    sliderBright->setValue(dev.currentSettings.value("brightness", 100).toInt());
+    basicForm->addRow("Brillo por software (%):", sliderBright);
+
+    QCheckBox *chkApplyLive = new QCheckBox("Aplicar al instante en la sesión actual (xrandr)", boxBasic);
+    chkApplyLive->setChecked(dev.currentSettings.value("applyLiveX11", true).toBool());
+    basicForm->addRow("", chkApplyLive);
+
+    mainLayout->addWidget(boxBasic);
+
+    QGroupBox *boxAdv = new QGroupBox("Opciones Avanzadas (Xorg / Controlador)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+
+    QCheckBox *chkTearFree = new QCheckBox("Habilitar TearFree (evita parpadeos y cortes horizontales)", boxAdv);
+    chkTearFree->setChecked(dev.currentSettings.value("tearFree", true).toBool());
+    advLayout->addWidget(chkTearFree);
+
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(120);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["outputName"] = comboOutput->currentText();
+        s["resolution"] = comboRes->currentText();
+        s["refreshRate"] = comboHz->currentText();
+        s["rotation"] = comboRot->currentData().toString();
+        s["brightness"] = sliderBright->value();
+        s["tearFree"] = chkTearFree->isChecked();
+        s["applyLiveX11"] = chkApplyLive->isChecked();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+    refreshPreview();
+    connect(comboOutput, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+    connect(comboRes, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+    connect(comboRot, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+    connect(chkTearFree, &QCheckBox::toggled, &dlg, refreshPreview);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    mainLayout->addWidget(btnBox);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
+}
+
+void MainWindow::openAudioConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Audio — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(520);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    QGroupBox *boxBasic = new QGroupBox("Ajustes de Sonido", &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(8);
+
+    QComboBox *comboCards = new QComboBox(boxBasic);
+    const QStringList cards = dev.currentSettings.value("cards").toStringList();
+    for (int i = 0; i < cards.size(); ++i) {
+        comboCards->addItem(cards[i], i);
+    }
+    if (comboCards->count() == 0) {
+        comboCards->addItem("card 0: Placa de Audio Principal", 0);
+    }
+    const int cardIdx = dev.currentSettings.value("cardIndex", 0).toInt();
+    if (cardIdx >= 0 && cardIdx < comboCards->count()) {
+        comboCards->setCurrentIndex(cardIdx);
+    }
+    basicForm->addRow("Tarjeta predeterminada:", comboCards);
+
+    QSlider *sliderVol = new QSlider(Qt::Horizontal, boxBasic);
+    sliderVol->setRange(0, 100);
+    sliderVol->setValue(dev.currentSettings.value("volume", 80).toInt());
+    QLabel *lblVol = new QLabel(QString("%1%").arg(sliderVol->value()), boxBasic);
+    lblVol->setMinimumWidth(40);
+    QWidget *volRow = new QWidget(boxBasic);
+    QHBoxLayout *volLayout = new QHBoxLayout(volRow);
+    volLayout->setContentsMargins(0, 0, 0, 0);
+    volLayout->addWidget(sliderVol, 1);
+    volLayout->addWidget(lblVol);
+    connect(sliderVol, &QSlider::valueChanged, &dlg, [lblVol](int v) {
+        lblVol->setText(QString("%1%").arg(v));
+    });
+    basicForm->addRow("Volumen maestro:", volRow);
+
+    QCheckBox *chkMute = new QCheckBox("Silenciar salida de audio (Mute)", boxBasic);
+    chkMute->setChecked(dev.currentSettings.value("muted", false).toBool());
+    basicForm->addRow("", chkMute);
+
+    QComboBox *comboProfile = new QComboBox(boxBasic);
+    comboProfile->addItem("Estéreo (2.0 canales)", "stereo");
+    comboProfile->addItem("Envolvente Surround 5.1 (6 canales)", "surround51");
+    const int pIdx = comboProfile->findData(dev.currentSettings.value("channelProfile", "stereo").toString());
+    if (pIdx >= 0) comboProfile->setCurrentIndex(pIdx);
+    basicForm->addRow("Perfil de canales:", comboProfile);
+
+    mainLayout->addWidget(boxBasic);
+
+    QGroupBox *boxAdv = new QGroupBox("Vista previa Avanzada (/etc/asound.conf)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(120);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["cardIndex"] = comboCards->currentData().toInt();
+        s["volume"] = sliderVol->value();
+        s["muted"] = chkMute->isChecked();
+        s["channelProfile"] = comboProfile->currentData().toString();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+    refreshPreview();
+    connect(comboCards, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+    connect(comboProfile, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    mainLayout->addWidget(btnBox);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
+}
+
+void MainWindow::openBluetoothConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Bluetooth — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(500);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    QGroupBox *boxBasic = new QGroupBox("Ajustes de Bluetooth (BlueZ)", &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(8);
+
+    QLineEdit *editName = new QLineEdit(dev.currentSettings.value("adapterName", "Slackware-PC").toString(), boxBasic);
+    basicForm->addRow("Nombre visible del equipo:", editName);
+
+    QCheckBox *chkAuto = new QCheckBox("Encender adaptador Bluetooth automáticamente al arrancar", boxBasic);
+    chkAuto->setChecked(dev.currentSettings.value("autoEnable", true).toBool());
+    basicForm->addRow("", chkAuto);
+
+    QCheckBox *chkDisc = new QCheckBox("Mantener equipo siempre visible para emparejar", boxBasic);
+    chkDisc->setChecked(dev.currentSettings.value("discoverable", false).toBool());
+    basicForm->addRow("", chkDisc);
+
+    QCheckBox *chkBoot = new QCheckBox("Habilitar servicio /etc/rc.d/rc.bluetooth en el arranque", boxBasic);
+    chkBoot->setChecked(dev.currentSettings.value("enableServiceBoot", true).toBool());
+    basicForm->addRow("", chkBoot);
+
+    mainLayout->addWidget(boxBasic);
+
+    QGroupBox *boxAdv = new QGroupBox("Vista previa Avanzada (/etc/bluetooth/main.conf)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(120);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["adapterName"] = editName->text().trimmed();
+        s["autoEnable"] = chkAuto->isChecked();
+        s["discoverable"] = chkDisc->isChecked();
+        s["enableServiceBoot"] = chkBoot->isChecked();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+    refreshPreview();
+    connect(editName, &QLineEdit::textChanged, &dlg, refreshPreview);
+    connect(chkAuto, &QCheckBox::toggled, &dlg, refreshPreview);
+    connect(chkDisc, &QCheckBox::toggled, &dlg, refreshPreview);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    mainLayout->addWidget(btnBox);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
+}
+
+void MainWindow::openNetworkConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Red — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(540);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    const QString iface = dev.currentSettings.value("interface", "eth0").toString();
+    const QString origManager = dev.currentSettings.value("networkManager", "rc.inet1").toString();
+    const bool origIsStatic = (dev.currentSettings.value("mode", "dhcp").toString() == "static");
+    const QString origIp = dev.currentSettings.value("ipAddress").toString();
+    const QString origMask = dev.currentSettings.value("netmask").toString();
+    const QString origGw = dev.currentSettings.value("gateway").toString();
+    const QString origDns = dev.currentSettings.value("dns").toString();
+
+    // Banner con la configuración real escaneada
+    QLabel *lblCurrentSummary = new QLabel(
+        QString("<b>Configuración actual detectada en %1:</b> %2 &nbsp;|&nbsp; <b>IP:</b> %3<br>"
+                "Los campos están bloqueados para evitar cambios accidentales. Pulsa <b>\"Cambiar valores\"</b> para editar.")
+            .arg(iface,
+                 origIsStatic ? "IP Estática (Manual)" : "Automática (DHCP)",
+                 origIp.isEmpty() ? "Sin IP asignada" : origIp),
+        &dlg
+    );
+    lblCurrentSummary->setWordWrap(true);
+    lblCurrentSummary->setStyleSheet(
+        "background-color: #eef4fa; color: #084298; border: 1px solid #b6d4fe; border-radius: 6px; padding: 10px; font-size: 12px;"
+    );
+    mainLayout->addWidget(lblCurrentSummary);
+
+    QGroupBox *boxBasic = new QGroupBox(QString("Configuración IP de %1").arg(iface), &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(8);
+
+    // Gestor de red instalado en el sistema
+    QComboBox *comboManager = new QComboBox(boxBasic);
+    const QStringList availManagers = dev.currentSettings.value("availableManagers").toStringList();
+    if (availManagers.contains("rc.inet1") || availManagers.isEmpty()) {
+        comboManager->addItem("Slackware clásico (rc.inet1 / rc.inet1.conf)", "rc.inet1");
+    }
+    if (availManagers.contains("networkmanager")) {
+        comboManager->addItem("NetworkManager (rc.networkmanager)", "networkmanager");
+    }
+    if (availManagers.contains("wicd")) {
+        comboManager->addItem("Wicd (rc.wicd)", "wicd");
+    }
+    const int mgrIdx = comboManager->findData(origManager);
+    if (mgrIdx >= 0) comboManager->setCurrentIndex(mgrIdx);
+    basicForm->addRow("Gestor de red:", comboManager);
+
+    // Modo DHCP o IP Estática
+    QRadioButton *radioDhcp = new QRadioButton("Automática por DHCP", boxBasic);
+    QRadioButton *radioStatic = new QRadioButton("Dirección IP estática (Manual)", boxBasic);
+    radioStatic->setChecked(origIsStatic);
+    radioDhcp->setChecked(!origIsStatic);
+    basicForm->addRow("", radioDhcp);
+    basicForm->addRow("", radioStatic);
+
+    // Campos con valores reales detectados
+    QLineEdit *editIp = new QLineEdit(origIp, boxBasic);
+    editIp->setPlaceholderText("ej. 192.168.1.50");
+    QLineEdit *editMask = new QLineEdit(origMask, boxBasic);
+    editMask->setPlaceholderText("ej. 255.255.255.0");
+    QLineEdit *editGw = new QLineEdit(origGw, boxBasic);
+    editGw->setPlaceholderText("ej. 192.168.1.1");
+    QLineEdit *editDns = new QLineEdit(origDns, boxBasic);
+    editDns->setPlaceholderText("ej. 1.1.1.1, 8.8.8.8");
+
+    basicForm->addRow("Dirección IP:", editIp);
+    basicForm->addRow("Máscara de subred:", editMask);
+    basicForm->addRow("Puerta de enlace (Gateway):", editGw);
+    basicForm->addRow("Servidores DNS:", editDns);
+
+    mainLayout->addWidget(boxBasic);
+
+    // Vista previa avanzada
+    QGroupBox *boxAdv = new QGroupBox("Vista previa Avanzada (/etc/rc.d/rc.inet1.conf)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(120);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    // Fila de botones: [Cambiar valores]  ...  [Cancelar] [Guardar y aplicar]
+    QHBoxLayout *bottomRow = new QHBoxLayout();
+    QPushButton *btnUnlock = new QPushButton("Cambiar valores", &dlg);
+    btnUnlock->setStyleSheet(
+        "QPushButton { background-color: #0d6efd; color: white; font-weight: bold; border-radius: 4px; padding: 6px 14px; }"
+        "QPushButton:hover { background-color: #0b5ed7; }"
+    );
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    QPushButton *btnSave = btnBox->button(QDialogButtonBox::Save);
+    btnSave->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+
+    bottomRow->addWidget(btnUnlock);
+    bottomRow->addStretch();
+    bottomRow->addWidget(btnBox);
+    mainLayout->addLayout(bottomRow);
+
+    bool editUnlocked = false;
+
+    auto applyLockState = [&]() {
+        comboManager->setEnabled(editUnlocked);
+        radioDhcp->setEnabled(editUnlocked);
+        radioStatic->setEnabled(editUnlocked);
+
+        const bool staticFieldsEditable = editUnlocked && radioStatic->isChecked();
+        editIp->setEnabled(staticFieldsEditable);
+        editMask->setEnabled(staticFieldsEditable);
+        editGw->setEnabled(staticFieldsEditable);
+        editDns->setEnabled(staticFieldsEditable);
+
+        btnSave->setEnabled(editUnlocked);
+        btnUnlock->setText(editUnlocked ? "Restaurar y bloquear" : "Cambiar valores");
+    };
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["interface"] = iface;
+        s["networkManager"] = comboManager->currentData().toString();
+        s["mode"] = radioStatic->isChecked() ? "static" : "dhcp";
+        s["ipAddress"] = editIp->text().trimmed();
+        s["netmask"] = editMask->text().trimmed();
+        s["gateway"] = editGw->text().trimmed();
+        s["dns"] = editDns->text().trimmed();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+
+    // Estado inicial: todo bloqueado mostrando valores reales
+    applyLockState();
+    refreshPreview();
+
+    connect(btnUnlock, &QPushButton::clicked, &dlg, [&]() {
+        editUnlocked = !editUnlocked;
+        if (!editUnlocked) {
+            // Restaurar valores originales escaneados al volver a bloquear
+            if (mgrIdx >= 0) comboManager->setCurrentIndex(mgrIdx);
+            radioStatic->setChecked(origIsStatic);
+            radioDhcp->setChecked(!origIsStatic);
+            editIp->setText(origIp);
+            editMask->setText(origMask);
+            editGw->setText(origGw);
+            editDns->setText(origDns);
+        }
+        applyLockState();
+        refreshPreview();
+    });
+
+    connect(radioStatic, &QRadioButton::toggled, &dlg, [&]() {
+        applyLockState();
+        refreshPreview();
+    });
+    connect(comboManager, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+    connect(editIp, &QLineEdit::textChanged, &dlg, refreshPreview);
+    connect(editMask, &QLineEdit::textChanged, &dlg, refreshPreview);
+    connect(editGw, &QLineEdit::textChanged, &dlg, refreshPreview);
+    connect(editDns, &QLineEdit::textChanged, &dlg, refreshPreview);
+
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
+}
+
+void MainWindow::openStorageConfigDialog(const DeviceInfo &dev)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("Configurar Almacenamiento — %1").arg(dev.friendlyName));
+    dlg.setMinimumWidth(500);
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+    mainLayout->setSpacing(12);
+
+    const bool isSsd = dev.currentSettings.value("isSsd", true).toBool();
+
+    QGroupBox *boxBasic = new QGroupBox("Optimización de Disco", &dlg);
+    boxBasic->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; }");
+    QFormLayout *basicForm = new QFormLayout(boxBasic);
+    basicForm->setSpacing(8);
+
+    QCheckBox *chkTrim = new QCheckBox("Ejecutar mantenimiento TRIM para SSD (fstrim -av)", boxBasic);
+    chkTrim->setChecked(dev.currentSettings.value("enableTrim", isSsd).toBool());
+    chkTrim->setEnabled(isSsd);
+    basicForm->addRow("", chkTrim);
+
+    mainLayout->addWidget(boxBasic);
+
+    QGroupBox *boxAdv = new QGroupBox("Opciones Avanzadas (Planificador E/S y reglas udev)", &dlg);
+    boxAdv->setStyleSheet("QGroupBox { font-weight: bold; font-size: 13px; color: #842029; }");
+    boxAdv->setVisible(m_deviceAdvancedMode);
+    QVBoxLayout *advLayout = new QVBoxLayout(boxAdv);
+    QFormLayout *advForm = new QFormLayout();
+
+    QComboBox *comboSched = new QComboBox(boxAdv);
+    comboSched->addItem("mq-deadline (Recomendado para SSD)", "mq-deadline");
+    comboSched->addItem("bfq (Ideal para escritorio y discos HDD)", "bfq");
+    comboSched->addItem("none (Directo para NVMe rápido)", "none");
+    const int schIdx = comboSched->findData(dev.currentSettings.value("scheduler", isSsd ? "mq-deadline" : "bfq").toString());
+    if (schIdx >= 0) comboSched->setCurrentIndex(schIdx);
+    advForm->addRow("Planificador I/O:", comboSched);
+
+    QPlainTextEdit *txtPreview = new QPlainTextEdit(boxAdv);
+    txtPreview->setReadOnly(true);
+    txtPreview->setMaximumHeight(100);
+    txtPreview->setStyleSheet("background-color: #1e242b; color: #eceff4; font-family: monospace; font-size: 11px;");
+
+    advLayout->addLayout(advForm);
+    advLayout->addWidget(txtPreview);
+    mainLayout->addWidget(boxAdv);
+
+    auto collectMap = [&]() -> QVariantMap {
+        QVariantMap s;
+        s["isSsd"] = isSsd;
+        s["enableTrim"] = chkTrim->isChecked();
+        s["scheduler"] = comboSched->currentData().toString();
+        return s;
+    };
+
+    auto refreshPreview = [&]() {
+        if (m_deviceAdvancedMode) {
+            txtPreview->setPlainText(DeviceManager::previewConfigContent(dev.id, collectMap()));
+        }
+    };
+    refreshPreview();
+    connect(comboSched, QOverload<int>::of(&QComboBox::currentIndexChanged), &dlg, refreshPreview);
+
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    btnBox->button(QDialogButtonBox::Save)->setText("Guardar y aplicar");
+    btnBox->button(QDialogButtonBox::Cancel)->setText("Cancelar");
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    mainLayout->addWidget(btnBox);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        commitDeviceSettings(dev, collectMap());
+    }
 }
 
 QWidget* MainWindow::createModulePlaceholderPage(const QString &title,
